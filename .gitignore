@@ -1,0 +1,17 @@
+# Dependencias
+backend/*/vendor/
+frontend/node_modules/
+
+# Configuración local
+backend/*/.env
+.env
+
+# Composer
+backend/*/composer.lock
+
+# Sistema y editores
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+*.log
