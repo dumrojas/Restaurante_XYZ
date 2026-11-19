@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservas - Restaurante XYZ</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h2>Mesas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Número</th>
+            <th>Capacidad</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="mesas-body"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Reservas</h2>
+      <form id="reserva-form">
+        <div class="form-grid">
+          <label>
+            Cliente
+            <input type="text" name="nombre_cliente" required>
+          </label>
+          <label>
+            Teléfono
+            <input type="text" name="telefono_cliente" required>
+          </label>
+          <label>
+            Personas
+            <input type="number" name="cantidad_personas" min="1" required>
+          </label>
+          <label>
+            Fecha
+            <input type="date" name="fecha" required>
+          </label>
+          <label>
+            Hora
+            <input type="time" name="hora" required>
+          </label>
+          <label>
+            Mesa
+            <select name="mesa_id" id="mesa-select" required></select>
+          </label>
+          <label>
+            Observaciones
+            <input type="text" name="observaciones">
+          </label>
+        </div>
+        <p style="margin-top: 1rem;">
+          <button type="submit" class="btn">Guardar reserva</button>
+        </p>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="reservas-body"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="../../assets/js/api/api.js"></script>
+  <script src="../../assets/js/utils/helpers.js"></script>
+  <script src="../../assets/js/components/navbar.js"></script>
+  <script>
+    renderNav('reservas');
+
+    const mesasBody = document.getElementById('mesas-body');
+    const reservasBody = document.getElementById('reservas-body');
+    const mesaSelect = document.getElementById('mesa-select');
+    const reservaForm = document.getElementById('reserva-form');
+
+    async function cargarMesas() {
+      try {
+        const mesas = await api.reservas.mesas();
+        mesasBody.innerHTML = '';
+        mesaSelect.innerHTML = '';
+
+        mesas.forEach((mesa) => {
+          const fila = document.createElement('tr');
+          fila.innerHTML =
+            '<td>' + (mesa.numero || '') + '</td>' +
+            '<td>' + (mesa.capacidad || '') + '</td>' +
+            '<td>' + (mesa.estado || '') + '</td>';
+          mesasBody.appendChild(fila);
+
+          const opcion = document.createElement('option');
+          opcion.value = mesa.id;
+          opcion.textContent = mesa.numero;
+          mesaSelect.appendChild(opcion);
+        });
+      } catch (error) {
+        showMessage(error.message || 'No se pudieron cargar las mesas', 'error');
+      }
+    }
+
+    async function cargarReservas() {
+      try {
+        const reservas = await api.reservas.reservas();
+        reservasBody.innerHTML = '';
+
+        reservas.forEach((reserva) => {
+          const fila = document.createElement('tr');
+          fila.innerHTML =
+            '<td>' + (reserva.nombre_cliente || '') + '</td>' +
+            '<td>' + (reserva.fecha || '') + '</td>' +
+            '<td>' + (reserva.hora || '') + '</td>' +
+            '<td>' + (reserva.estado || '') + '</td>';
+          reservasBody.appendChild(fila);
+        });
+      } catch (error) {
+        showMessage(error.message || 'No se pudieron cargar las reservas', 'error');
+      }
+    }
+
+    reservaForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!validateRequired(reservaForm)) {
+        return;
+      }
+
+      const reserva = {
+        nombre_cliente: reservaForm.nombre_cliente.value.trim(),
+        telefono_cliente: reservaForm.telefono_cliente.value.trim(),
+        cantidad_personas: reservaForm.cantidad_personas.value,
+        fecha: reservaForm.fecha.value,
+        hora: reservaForm.hora.value,
+        mesa_id: reservaForm.mesa_id.value,
+        observaciones: reservaForm.observaciones.value.trim(),
+      };
+
+      try {
+        await api.reservas.crearReserva(reserva);
+        showMessage('Reserva guardada', 'success');
+        reservaForm.reset();
+        cargarReservas();
+      } catch (error) {
+        showMessage(error.message || 'No se pudo guardar la reserva', 'error');
+      }
+    });
+
+    cargarMesas();
+    cargarReservas();
+  </script>
+</body>
+</html>
