@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos - Restaurante XYZ</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h2>Pedidos</h2>
+      <form id="pedido-form">
+        <div class="form-grid">
+          <label>
+            Mesa
+            <select name="mesa_id" id="mesa-select" required></select>
+          </label>
+          <label>
+            Producto
+            <select name="producto_id" id="producto-select" required></select>
+          </label>
+          <label>
+            Cantidad
+            <input type="number" name="cantidad" min="1" value="1" required>
+          </label>
+        </div>
+        <p style="margin-top: 1rem;">
+          <button type="submit" class="btn">Agregar al pedido</button>
+        </p>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>Mesa</th>
+            <th>Total</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="pedidos-body"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="../../assets/js/api/api.js"></script>
+  <script src="../../assets/js/utils/helpers.js"></script>
+  <script src="../../assets/js/components/navbar.js"></script>
+  <script>
+    renderNav('pedidos');
+
+    const pedidosBody = document.getElementById('pedidos-body');
+    const pedidoForm = document.getElementById('pedido-form');
+    const mesaSelect = document.getElementById('mesa-select');
+    const productoSelect = document.getElementById('producto-select');
+
+    async function cargarOpciones() {
+      try {
+        const mesas = await api.reservas.mesas();
+        mesas.forEach((mesa) => {
+          const opcion = document.createElement('option');
+          opcion.value = mesa.id;
+          opcion.textContent = mesa.numero;
+          mesaSelect.appendChild(opcion);
+        });
+
+        const productos = await api.productos.listar();
+        productos.forEach((producto) => {
+          const opcion = document.createElement('option');
+          opcion.value = producto.id;
+          opcion.textContent = producto.nombre;
+          productoSelect.appendChild(opcion);
+        });
+      } catch (error) {
+        showMessage(error.message || 'No se pudieron cargar las opciones', 'error');
+      }
+    }
+
+    async function cargarPedidos() {
+      try {
+        const pedidos = await api.pedidos.listar();
+        pedidosBody.innerHTML = '';
+
+        pedidos.forEach((pedido) => {
+          const fila = document.createElement('tr');
+          fila.innerHTML =
+            '<td>' + (pedido.mesa_id || '') + '</td>' +
+            '<td>' + formatMoney(pedido.total) + '</td>' +
+            '<td>' + (pedido.estado || '') + '</td>';
+          pedidosBody.appendChild(fila);
+        });
+      } catch (error) {
+        showMessage(error.message || 'No se pudieron cargar los pedidos', 'error');
+      }
+    }
+
+    pedidoForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!validateRequired(pedidoForm)) {
+        return;
+      }
+
+      const pedido = {
+        mesa_id: pedidoForm.mesa_id.value,
+        producto_id: pedidoForm.producto_id.value,
+        cantidad: pedidoForm.cantidad.value,
+      };
+
+      try {
+        await api.pedidos.crear(pedido);
+        showMessage('Pedido registrado', 'success');
+        cargarPedidos();
+      } catch (error) {
+        showMessage(error.message || 'No se pudo registrar el pedido', 'error');
+      }
+    });
+
+    cargarOpciones();
+    cargarPedidos();
+  </script>
+</body>
+</html>
