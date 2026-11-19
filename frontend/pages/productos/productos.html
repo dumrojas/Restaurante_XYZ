@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos - Restaurante XYZ</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h2>Productos</h2>
+      <form id="producto-form">
+        <div class="form-grid">
+          <label>
+            Nombre
+            <input type="text" name="nombre" required>
+          </label>
+          <label>
+            Categoría
+            <input type="text" name="categoria" required>
+          </label>
+          <label>
+            Precio
+            <input type="number" name="precio" min="0" step="0.01" required>
+          </label>
+        </div>
+        <p style="margin-top: 1rem;">
+          <button type="submit" class="btn">Guardar producto</button>
+        </p>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>Disponible</th>
+          </tr>
+        </thead>
+        <tbody id="productos-body"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="../../assets/js/api/api.js"></script>
+  <script src="../../assets/js/utils/helpers.js"></script>
+  <script src="../../assets/js/components/navbar.js"></script>
+  <script>
+    renderNav('productos');
+
+    const productosBody = document.getElementById('productos-body');
+    const productoForm = document.getElementById('producto-form');
+
+    async function cargarProductos() {
+      try {
+        const productos = await api.productos.listar();
+        productosBody.innerHTML = '';
+
+        productos.forEach((producto) => {
+          const fila = document.createElement('tr');
+          fila.innerHTML =
+            '<td>' + (producto.nombre || '') + '</td>' +
+            '<td>' + (producto.categoria || '') + '</td>' +
+            '<td>' + formatMoney(producto.precio) + '</td>' +
+            '<td>' + (producto.disponible ? 'Sí' : 'No') + '</td>';
+          productosBody.appendChild(fila);
+        });
+      } catch (error) {
+        showMessage(error.message || 'No se pudieron cargar los productos', 'error');
+      }
+    }
+
+    productoForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!validateRequired(productoForm)) {
+        return;
+      }
+
+      const producto = {
+        nombre: productoForm.nombre.value.trim(),
+        categoria: productoForm.categoria.value.trim(),
+        precio: productoForm.precio.value,
+      };
+
+      try {
+        await api.productos.crear(producto);
+        showMessage('Producto guardado', 'success');
+        productoForm.reset();
+        cargarProductos();
+      } catch (error) {
+        showMessage(error.message || 'No se pudo guardar el producto', 'error');
+      }
+    });
+
+    cargarProductos();
+  </script>
+</body>
+</html>
