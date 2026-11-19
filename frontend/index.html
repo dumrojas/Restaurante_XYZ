@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurante XYZ</title>
+</head>
+<body>
+  <p>Redirigiendo...</p>
+  <script>
+    if (localStorage.getItem('restaurante_token')) {
+      window.location.href = 'pages/reservas/reservas.html';
+    } else {
+      window.location.href = 'pages/auth/login.html';
+    }
+  </script>
+</body>
+</html>

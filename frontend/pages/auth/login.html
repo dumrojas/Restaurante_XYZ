@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión - Restaurante XYZ</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>Restaurante XYZ</h1>
+      <form id="login-form">
+        <div class="form-grid">
+          <label>
+            Usuario o correo
+            <input type="text" name="usuario" required autocomplete="username">
+          </label>
+          <label>
+            Contraseña
+            <input type="password" name="contrasena" required autocomplete="current-password">
+          </label>
+        </div>
+        <p style="margin-top: 1rem;">
+          <button type="submit" class="btn" style="width: 100%;">Ingresar</button>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script src="../../assets/js/api/api.js"></script>
+  <script src="../../assets/js/utils/helpers.js"></script>
+  <script>
+    const form = document.getElementById('login-form');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!validateRequired(form)) {
+        return;
+      }
+
+      const credenciales = {
+        usuario: form.usuario.value.trim(),
+        contrasena: form.contrasena.value.trim(),
+      };
+
+      try {
+        const respuesta = await api.auth.login(credenciales);
+        const token = respuesta.token || (respuesta.data && respuesta.data.token);
+
+        if (!token) {
+          throw new Error('El servidor no devolvió un token');
+        }
+
+        TokenStore.set(token);
+        showMessage('Bienvenido', 'success');
+        window.location.href = '../reservas/reservas.html';
+      } catch (error) {
+        showMessage(error.message || 'No se pudo iniciar sesión', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
