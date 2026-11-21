@@ -16,6 +16,14 @@ class ProductoController
 
         if (!empty($params['categoria_id'])) {
             $query->where('categoria_id', (int) $params['categoria_id']);
+        } elseif (!empty($params['categoria'])) {
+            $categoria = Categoria::where('nombre', $params['categoria'])->first();
+
+            if ($categoria) {
+                $query->where('categoria_id', $categoria->id);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
         }
 
         if (isset($params['disponible']) && $params['disponible'] !== '') {
@@ -144,10 +152,7 @@ class ProductoController
         }
 
         if (!empty($data['categoria'])) {
-            return Categoria::firstOrCreate(
-                ['nombre' => trim((string) $data['categoria'])],
-                ['descripcion' => null]
-            );
+            return Categoria::where('nombre', trim((string) $data['categoria']))->first();
         }
 
         return null;

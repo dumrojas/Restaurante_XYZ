@@ -14,11 +14,13 @@ Backend del sistema de reservas y pedidos. Cada servicio usa PHP 8, Slim 4, Eloq
 ```bash
 cd backend/ms-auth
 composer install
-cp .env.example .env
 php -S 127.0.0.1:8000 -t public
 ```
 
 Cada servicio se ejecuta igual, cambiando la carpeta y el puerto.
+Cada servicio necesita un archivo `.env` con: `APP_NAME`, `APP_ENV`, `APP_DEBUG`,
+`DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` y
+`DB_AUTH_DATABASE`. En `ms-pedidos` también `DB_RESERVAS_DATABASE`.
 
 ## Bases de datos
 
@@ -28,15 +30,9 @@ Los scripts están en `backend/<servicio>/database/schema.sql`:
 mysql -u root < backend/ms-auth/database/schema.sql
 ```
 
-## Endpoints base
+## Endpoints
 
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/` | Mensaje de bienvenida del servicio |
-| GET | `/health` | Estado del servicio |
-| GET | `/admin` | Ruta protegida de ejemplo |
-
-La ruta `/admin` requiere el encabezado `Authorization: Bearer 12345`.
+La documentación de los endpoints está en `../docs/endpoints.md`.
 
 ## Estructura
 

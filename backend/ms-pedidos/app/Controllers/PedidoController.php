@@ -22,8 +22,13 @@ class PedidoController
         }
 
         $pedidos = $query->orderBy('fecha', 'desc')->orderBy('hora', 'desc')->get();
+        $respuesta = [];
 
-        return $this->json($response, $pedidos->toArray());
+        foreach ($pedidos as $pedido) {
+            $respuesta[] = $this->pedidoArray($pedido);
+        }
+
+        return $this->json($response, $respuesta);
     }
 
     public function show(Request $request, Response $response, array $args): Response
@@ -34,7 +39,7 @@ class PedidoController
             return $this->json($response, ['error' => 'Pedido no encontrado'], 404);
         }
 
-        return $this->json($response, $pedido->toArray());
+        return $this->json($response, $this->pedidoArray($pedido));
     }
 
     public function store(Request $request, Response $response): Response
@@ -59,7 +64,6 @@ class PedidoController
         }
 
         $total = 0;
-        $cantidadTotal = 0;
         $detalles = [];
 
         foreach ($items as $item) {
@@ -77,7 +81,6 @@ class PedidoController
 
             $subtotal = $cantidad * $precio;
             $total += $subtotal;
-            $cantidadTotal += $cantidad;
 
             $detalles[] = [
                 'producto_id' => $productoId,
@@ -94,13 +97,12 @@ class PedidoController
             'hora' => $data['hora'] ?? date('H:i:s'),
             'subtotal' => $total,
             'total' => $total,
-            'cantidad_total' => $cantidadTotal,
             'estado' => 'pendiente',
         ]);
 
         $pedido->detalles()->createMany($detalles);
 
-        return $this->json($response, $pedido->load('detalles')->toArray(), 201);
+        return $this->json($response, $this->pedidoArray($pedido), 201);
     }
 
     public function agregarProducto(Request $request, Response $response, array $args): Response
@@ -133,7 +135,7 @@ class PedidoController
             'subtotal' => $cantidad * $precio,
         ]);
 
-        return $this->json($response, $this->recalcular($pedido)->toArray(), 201);
+        return $this->json($response, $this->pedidoArray($this->recalcular($pedido)), 201);
     }
 
     public function cambiarCantidad(Request $request, Response $response, array $args): Response
@@ -155,7 +157,7 @@ class PedidoController
         $detalle->subtotal = $cantidad * (float) $detalle->precio_unitario;
         $detalle->save();
 
-        return $this->json($response, $this->recalcular($detalle->pedido)->toArray());
+        return $this->json($response, $this->pedidoArray($this->recalcular($detalle->pedido)));
     }
 
     public function eliminarProducto(Request $request, Response $response, array $args): Response
@@ -169,7 +171,7 @@ class PedidoController
         $pedido = $detalle->pedido;
         $detalle->delete();
 
-        return $this->json($response, $this->recalcular($pedido)->toArray());
+        return $this->json($response, $this->pedidoArray($this->recalcular($pedido)));
     }
 
     public function updateEstado(Request $request, Response $response, array $args): Response
@@ -190,7 +192,7 @@ class PedidoController
         $pedido->estado = $estado;
         $pedido->save();
 
-        return $this->json($response, $pedido->load('detalles')->toArray());
+        return $this->json($response, $this->pedidoArray($pedido));
     }
 
     private function detalle(int $pedidoId, int $detalleId): ?DetallePedido
@@ -201,19 +203,25 @@ class PedidoController
     private function recalcular(Pedido $pedido): Pedido
     {
         $total = 0;
-        $cantidadTotal = 0;
 
         foreach ($pedido->detalles as $detalle) {
             $total += (float) $detalle->subtotal;
-            $cantidadTotal += (int) $detalle->cantidad;
         }
 
         $pedido->subtotal = $total;
         $pedido->total = $total;
-        $pedido->cantidad_total = $cantidadTotal;
         $pedido->save();
 
         return $pedido->load('detalles');
+    }
+
+    private function pedidoArray(Pedido $pedido): array
+    {
+        $pedido->load('detalles');
+        $respuesta = $pedido->toArray();
+        $respuesta['cantidad_total'] = (int) $pedido->detalles->sum('cantidad');
+
+        return $respuesta;
     }
 
     private function validarMesa(int $mesaId): ?string

@@ -65,12 +65,21 @@ class ReservaController
             return $this->json($response, ['error' => 'Reserva no encontrada'], 404);
         }
 
-        $data = array_merge($reserva->toArray(), (array) $request->getParsedBody());
+        $datos = (array) $request->getParsedBody();
 
-        $error = $this->validarReserva($data, (int) $reserva->id);
+        if (isset($datos['estado']) && !in_array($datos['estado'], self::ESTADOS, true)) {
+            return $this->json($response, ['error' => 'Estado de reserva no válido'], 422);
+        }
 
-        if ($error !== null) {
-            return $this->json($response, ['error' => $error], 422);
+        $soloEstado = array_keys($datos) === ['estado'];
+        $data = array_merge($reserva->toArray(), $datos);
+
+        if (!$soloEstado) {
+            $error = $this->validarReserva($data, (int) $reserva->id);
+
+            if ($error !== null) {
+                return $this->json($response, ['error' => $error], 422);
+            }
         }
 
         $reserva->fill([
@@ -81,6 +90,7 @@ class ReservaController
             'hora' => $data['hora'],
             'observaciones' => $data['observaciones'] ?? null,
             'mesa_id' => (int) $data['mesa_id'],
+            'estado' => $data['estado'],
         ]);
 
         $reserva->save();
@@ -101,27 +111,6 @@ class ReservaController
         }
 
         $reserva->estado = 'cancelada';
-        $reserva->save();
-
-        return $this->json($response, $reserva->toArray());
-    }
-
-    public function updateEstado(Request $request, Response $response, array $args): Response
-    {
-        $reserva = Reserva::find((int) $args['id']);
-
-        if (!$reserva) {
-            return $this->json($response, ['error' => 'Reserva no encontrada'], 404);
-        }
-
-        $data = (array) $request->getParsedBody();
-        $estado = (string) ($data['estado'] ?? '');
-
-        if (!in_array($estado, self::ESTADOS, true)) {
-            return $this->json($response, ['error' => 'Estado de reserva no válido'], 422);
-        }
-
-        $reserva->estado = $estado;
         $reserva->save();
 
         return $this->json($response, $reserva->toArray());

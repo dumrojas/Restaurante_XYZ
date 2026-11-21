@@ -121,20 +121,15 @@ const api = {
     mesas: () => request('reservas', '/mesas'),
     crearMesa: (mesa) => request('reservas', '/mesas', conCuerpo('POST', mesa)),
     actualizarMesa: (id, mesa) => request('reservas', '/mesas/' + id, conCuerpo('PUT', mesa)),
-    cambiarEstadoMesa: (id, estado) =>
-      request('reservas', '/mesas/' + id + '/estado', conCuerpo('PATCH', { estado })),
 
     reservas: (filtros) => request('reservas', '/reservas' + queryString(filtros)),
     crearReserva: (reserva) => request('reservas', '/reservas', conCuerpo('POST', reserva)),
     actualizarReserva: (id, reserva) =>
       request('reservas', '/reservas/' + id, conCuerpo('PUT', reserva)),
     cancelarReserva: (id) => request('reservas', '/reservas/' + id + '/cancelar', { method: 'PATCH' }),
-    cambiarEstadoReserva: (id, estado) =>
-      request('reservas', '/reservas/' + id + '/estado', conCuerpo('PATCH', { estado })),
   },
 
   productos: {
-    categorias: () => request('productos', '/categorias'),
     listar: (filtros) => request('productos', '/productos' + queryString(filtros)),
     crear: (producto) => request('productos', '/productos', conCuerpo('POST', producto)),
     actualizar: (id, producto) => request('productos', '/productos/' + id, conCuerpo('PUT', producto)),

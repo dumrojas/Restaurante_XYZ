@@ -333,7 +333,7 @@
           cambiar.disabled = true;
 
           try {
-            await api.reservas.cambiarEstadoMesa(id, select.value);
+            await api.reservas.actualizarMesa(id, { estado: select.value });
             showMessage('Estado de la mesa actualizado', 'success');
             await cargarMesas();
           } catch (error) {
@@ -421,7 +421,7 @@
             await api.reservas.cancelarReserva(boton.dataset.id);
             showMessage('Reserva cancelada', 'success');
           } else {
-            await api.reservas.cambiarEstadoReserva(boton.dataset.id, boton.dataset.accion);
+            await api.reservas.actualizarReserva(boton.dataset.id, { estado: boton.dataset.accion });
             showMessage('Reserva actualizada', 'success');
           }
 

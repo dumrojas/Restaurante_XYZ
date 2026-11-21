@@ -268,9 +268,11 @@
           }
 
           pedidos.forEach((pedido) => {
-            const detalle = (pedido.detalles || [])
+            const detalles = pedido.detalles || [];
+            const detalle = detalles
               .map((item) => item.cantidad + '× ' + item.nombre_producto)
               .join(', ');
+            const unidades = detalles.reduce((total, item) => total + Number(item.cantidad), 0);
             const acciones = [];
 
             acciones.push(
@@ -310,7 +312,7 @@
               '<td>' + escapeHtml(nombreMesa(pedido.mesa_id)) + '</td>' +
               '<td>' + escapeHtml(detalle || 'Sin detalle') + '</td>' +
               '<td>' + escapeHtml(formatMoney(pedido.total)) + '</td>' +
-              '<td>' + Number(pedido.cantidad_total || 0) + '</td>' +
+              '<td>' + unidades + '</td>' +
               '<td><span class="badge badge-' + escapeHtml(pedido.estado) + '">' +
                 escapeHtml(formatEstado(pedido.estado)) + '</span></td>' +
               '<td><div class="actions">' + botonGestionar + botonesEstado + '</div></td>';
@@ -351,8 +353,13 @@
             detalleBody.innerHTML = '<tr><td colspan="5" class="empty">El pedido no tiene productos</td></tr>';
           }
 
+          const unidades = (pedido.detalles || []).reduce(
+            (total, item) => total + Number(item.cantidad),
+            0
+          );
+
           gestionTotal.textContent = 'Total: ' + formatMoney(pedido.total) +
-            ' · ' + Number(pedido.cantidad_total || 0) + ' productos';
+            ' · ' + unidades + ' productos';
         } catch (error) {
           showMessage(error.message || 'No se pudo consultar el detalle', 'error');
         }
