@@ -18,13 +18,18 @@
           </label>
           <label>
             Categoría
-            <input type="text" name="categoria" required>
+            <input type="text" name="categoria" list="categorias-list" required>
           </label>
           <label>
             Precio
-            <input type="number" name="precio" min="0" step="0.01" required>
+            <input type="number" name="precio" min="1" step="0.01" required>
+          </label>
+          <label>
+            Descripción
+            <input type="text" name="descripcion">
           </label>
         </div>
+        <datalist id="categorias-list"></datalist>
         <p style="margin-top: 1rem;">
           <button type="submit" class="btn">Guardar producto</button>
         </p>
@@ -36,6 +41,7 @@
             <th>Categoría</th>
             <th>Precio</th>
             <th>Disponible</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="productos-body"></tbody>
@@ -47,54 +53,131 @@
   <script src="../../assets/js/utils/helpers.js"></script>
   <script src="../../assets/js/components/navbar.js"></script>
   <script>
-    renderNav('productos');
+    if (requireSession()) {
+      renderNav('productos');
 
-    const productosBody = document.getElementById('productos-body');
-    const productoForm = document.getElementById('producto-form');
+      const productosBody = document.getElementById('productos-body');
+      const productoForm = document.getElementById('producto-form');
+      const categoriasList = document.getElementById('categorias-list');
 
-    async function cargarProductos() {
-      try {
-        const productos = await api.productos.listar();
-        productosBody.innerHTML = '';
+      let categoriasPorId = {};
 
-        productos.forEach((producto) => {
-          const fila = document.createElement('tr');
-          fila.innerHTML =
-            '<td>' + (producto.nombre || '') + '</td>' +
-            '<td>' + (producto.categoria || '') + '</td>' +
-            '<td>' + formatMoney(producto.precio) + '</td>' +
-            '<td>' + (producto.disponible ? 'Sí' : 'No') + '</td>';
-          productosBody.appendChild(fila);
-        });
-      } catch (error) {
-        showMessage(error.message || 'No se pudieron cargar los productos', 'error');
+      async function cargarCategorias() {
+        try {
+          const categorias = await api.productos.categorias();
+
+          categoriasPorId = {};
+          categoriasList.innerHTML = '';
+
+          categorias.forEach((categoria) => {
+            categoriasPorId[categoria.id] = categoria.nombre;
+
+            const opcion = document.createElement('option');
+            opcion.value = categoria.nombre;
+            categoriasList.appendChild(opcion);
+          });
+        } catch (error) {
+          showMessage(error.message || 'No se pudieron cargar las categorías', 'error');
+        }
       }
+
+      async function cargarProductos() {
+        try {
+          const productos = await api.productos.listar();
+
+          productosBody.innerHTML = '';
+
+          if (!productos.length) {
+            productosBody.innerHTML = '<tr><td colspan="5" class="empty">No hay productos registrados</td></tr>';
+            return;
+          }
+
+          productos.forEach((producto) => {
+            const disponible = Number(producto.disponible) === 1;
+
+            const fila = document.createElement('tr');
+            fila.innerHTML =
+              '<td>' + escapeHtml(producto.nombre) + '</td>' +
+              '<td>' + escapeHtml(categoriasPorId[producto.categoria_id] || 'Sin categoría') + '</td>' +
+              '<td>' + escapeHtml(formatMoney(producto.precio)) + '</td>' +
+              '<td><span class="badge ' + (disponible ? 'badge-disponible' : 'badge-cancelado') + '">' +
+                (disponible ? 'Sí' : 'No') + '</span></td>' +
+              '<td><div class="actions">' +
+                '<button type="button" class="btn btn-small btn-secondary" data-accion="disponible" ' +
+                  'data-id="' + producto.id + '" data-valor="' + (disponible ? '0' : '1') + '">' +
+                  (disponible ? 'Marcar agotado' : 'Marcar disponible') + '</button>' +
+                '<button type="button" class="btn btn-small btn-danger" data-accion="eliminar" ' +
+                  'data-id="' + producto.id + '">Eliminar</button>' +
+              '</div></td>';
+            productosBody.appendChild(fila);
+          });
+        } catch (error) {
+          showMessage(error.message || 'No se pudieron cargar los productos', 'error');
+        }
+      }
+
+      productosBody.addEventListener('click', async (event) => {
+        const boton = event.target.closest('button[data-accion]');
+
+        if (!boton) {
+          return;
+        }
+
+        boton.disabled = true;
+
+        try {
+          if (boton.dataset.accion === 'eliminar') {
+            if (!confirm('¿Eliminar este producto?')) {
+              boton.disabled = false;
+              return;
+            }
+
+            await api.productos.eliminar(boton.dataset.id);
+            showMessage('Producto eliminado', 'success');
+          } else {
+            await api.productos.actualizar(boton.dataset.id, {
+              disponible: boton.dataset.valor === '1',
+            });
+            showMessage('Producto actualizado', 'success');
+          }
+
+          await cargarProductos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo actualizar el producto', 'error');
+          boton.disabled = false;
+        }
+      });
+
+      productoForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        if (!validateRequired(productoForm)) {
+          return;
+        }
+
+        const producto = {
+          nombre: productoForm.nombre.value.trim(),
+          categoria: productoForm.categoria.value.trim(),
+          precio: Number(productoForm.precio.value),
+          descripcion: productoForm.descripcion.value.trim(),
+        };
+
+        try {
+          await api.productos.crear(producto);
+          showMessage('Producto guardado', 'success');
+          productoForm.reset();
+          await cargarCategorias();
+          await cargarProductos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo guardar el producto', 'error');
+        }
+      });
+
+      (async () => {
+        await cargarCategorias();
+        await cargarProductos();
+      })();
     }
-
-    productoForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      if (!validateRequired(productoForm)) {
-        return;
-      }
-
-      const producto = {
-        nombre: productoForm.nombre.value.trim(),
-        categoria: productoForm.categoria.value.trim(),
-        precio: productoForm.precio.value,
-      };
-
-      try {
-        await api.productos.crear(producto);
-        showMessage('Producto guardado', 'success');
-        productoForm.reset();
-        cargarProductos();
-      } catch (error) {
-        showMessage(error.message || 'No se pudo guardar el producto', 'error');
-      }
-    });
-
-    cargarProductos();
   </script>
 </body>
 </html>

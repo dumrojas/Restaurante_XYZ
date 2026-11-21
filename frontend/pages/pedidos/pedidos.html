@@ -9,8 +9,8 @@
 <body>
   <div class="container">
     <section class="card">
-      <h2>Pedidos</h2>
-      <form id="pedido-form">
+      <h2>Nuevo pedido</h2>
+      <form id="item-form">
         <div class="form-grid">
           <label>
             Mesa
@@ -26,15 +26,38 @@
           </label>
         </div>
         <p style="margin-top: 1rem;">
-          <button type="submit" class="btn">Agregar al pedido</button>
+          <button type="submit" class="btn btn-secondary">Agregar producto</button>
         </p>
       </form>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Precio</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="carrito-body"></tbody>
+      </table>
+      <p class="cart-total" id="carrito-total">Total: $0</p>
+      <p style="text-align: right;">
+        <button type="button" class="btn" id="registrar-pedido">Registrar pedido</button>
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Pedidos registrados</h2>
       <table>
         <thead>
           <tr>
             <th>Mesa</th>
+            <th>Productos</th>
             <th>Total</th>
             <th>Estado</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="pedidos-body"></tbody>
@@ -46,77 +69,249 @@
   <script src="../../assets/js/utils/helpers.js"></script>
   <script src="../../assets/js/components/navbar.js"></script>
   <script>
-    renderNav('pedidos');
+    if (requireSession()) {
+      renderNav('pedidos');
 
-    const pedidosBody = document.getElementById('pedidos-body');
-    const pedidoForm = document.getElementById('pedido-form');
-    const mesaSelect = document.getElementById('mesa-select');
-    const productoSelect = document.getElementById('producto-select');
+      const pedidosBody = document.getElementById('pedidos-body');
+      const itemForm = document.getElementById('item-form');
+      const mesaSelect = document.getElementById('mesa-select');
+      const productoSelect = document.getElementById('producto-select');
+      const carritoBody = document.getElementById('carrito-body');
+      const carritoTotal = document.getElementById('carrito-total');
+      const registrarPedido = document.getElementById('registrar-pedido');
 
-    async function cargarOpciones() {
-      try {
-        const mesas = await api.reservas.mesas();
-        mesas.forEach((mesa) => {
-          const opcion = document.createElement('option');
-          opcion.value = mesa.id;
-          opcion.textContent = mesa.numero;
-          mesaSelect.appendChild(opcion);
-        });
+      let mesasPorId = {};
+      let productosPorId = {};
+      let carrito = [];
 
-        const productos = await api.productos.listar();
-        productos.forEach((producto) => {
-          const opcion = document.createElement('option');
-          opcion.value = producto.id;
-          opcion.textContent = producto.nombre;
-          productoSelect.appendChild(opcion);
-        });
-      } catch (error) {
-        showMessage(error.message || 'No se pudieron cargar las opciones', 'error');
+      function nombreMesa(id) {
+        return mesasPorId[id] ? mesasPorId[id].numero : 'Mesa ' + id;
       }
-    }
 
-    async function cargarPedidos() {
-      try {
-        const pedidos = await api.pedidos.listar();
-        pedidosBody.innerHTML = '';
+      function renderCarrito() {
+        carritoBody.innerHTML = '';
 
-        pedidos.forEach((pedido) => {
+        if (!carrito.length) {
+          carritoBody.innerHTML =
+            '<tr><td colspan="5" class="empty">Agrega productos para armar el pedido</td></tr>';
+          carritoTotal.textContent = 'Total: $0';
+          return;
+        }
+
+        let total = 0;
+
+        carrito.forEach((item, indice) => {
+          const subtotal = item.precio_unitario * item.cantidad;
+          total += subtotal;
+
           const fila = document.createElement('tr');
           fila.innerHTML =
-            '<td>' + (pedido.mesa_id || '') + '</td>' +
-            '<td>' + formatMoney(pedido.total) + '</td>' +
-            '<td>' + (pedido.estado || '') + '</td>';
-          pedidosBody.appendChild(fila);
+            '<td>' + escapeHtml(item.nombre_producto) + '</td>' +
+            '<td>' + escapeHtml(formatMoney(item.precio_unitario)) + '</td>' +
+            '<td>' + item.cantidad + '</td>' +
+            '<td>' + escapeHtml(formatMoney(subtotal)) + '</td>' +
+            '<td><button type="button" class="btn btn-small btn-danger" ' +
+              'data-quitar="' + indice + '">Quitar</button></td>';
+          carritoBody.appendChild(fila);
         });
-      } catch (error) {
-        showMessage(error.message || 'No se pudieron cargar los pedidos', 'error');
+
+        carritoTotal.textContent = 'Total: ' + formatMoney(total);
       }
+
+      async function cargarOpciones() {
+        try {
+          const [mesas, productos] = await Promise.all([
+            api.reservas.mesas(),
+            api.productos.listar({ disponible: true }),
+          ]);
+
+          mesasPorId = {};
+          productosPorId = {};
+
+          mesaSelect.innerHTML = '<option value="">Selecciona una mesa</option>';
+          productoSelect.innerHTML = '<option value="">Selecciona un producto</option>';
+
+          mesas.forEach((mesa) => {
+            mesasPorId[mesa.id] = mesa;
+
+            const opcion = document.createElement('option');
+            opcion.value = mesa.id;
+            opcion.textContent = mesa.numero + ' (' + mesa.capacidad + ' personas)';
+
+            if (mesa.estado === 'fuera_servicio') {
+              opcion.disabled = true;
+            }
+
+            mesaSelect.appendChild(opcion);
+          });
+
+          productos.forEach((producto) => {
+            productosPorId[producto.id] = producto;
+
+            const opcion = document.createElement('option');
+            opcion.value = producto.id;
+            opcion.textContent = producto.nombre + ' - ' + formatMoney(producto.precio);
+            productoSelect.appendChild(opcion);
+          });
+        } catch (error) {
+          showMessage(error.message || 'No se pudieron cargar las opciones', 'error');
+        }
+      }
+
+      async function cargarPedidos() {
+        try {
+          const pedidos = await api.pedidos.listar();
+
+          pedidosBody.innerHTML = '';
+
+          if (!pedidos.length) {
+            pedidosBody.innerHTML = '<tr><td colspan="5" class="empty">No hay pedidos registrados</td></tr>';
+            return;
+          }
+
+          pedidos.forEach((pedido) => {
+            const detalle = (pedido.detalles || [])
+              .map((item) => item.cantidad + '× ' + item.nombre_producto)
+              .join(', ');
+            const acciones = [];
+
+            if (pedido.estado === 'pendiente') {
+              acciones.push({ estado: 'en_preparacion', texto: 'Preparar', clase: '' });
+            }
+
+            if (pedido.estado === 'en_preparacion') {
+              acciones.push({ estado: 'entregado', texto: 'Entregar', clase: '' });
+            }
+
+            if (pedido.estado === 'entregado') {
+              acciones.push({ estado: 'pagado', texto: 'Pagar', clase: '' });
+            }
+
+            if (pedido.estado === 'pendiente' || pedido.estado === 'en_preparacion') {
+              acciones.push({ estado: 'cancelado', texto: 'Cancelar', clase: ' btn-danger' });
+            }
+
+            const botones = acciones
+              .map(
+                (accion) =>
+                  '<button type="button" class="btn btn-small' + accion.clase + '" ' +
+                  'data-id="' + pedido.id + '" data-estado="' + accion.estado + '">' +
+                  accion.texto + '</button>'
+              )
+              .join('');
+
+            const fila = document.createElement('tr');
+            fila.innerHTML =
+              '<td>' + escapeHtml(nombreMesa(pedido.mesa_id)) + '</td>' +
+              '<td>' + escapeHtml(detalle || 'Sin detalle') + '</td>' +
+              '<td>' + escapeHtml(formatMoney(pedido.total)) + '</td>' +
+              '<td><span class="badge badge-' + escapeHtml(pedido.estado) + '">' +
+                escapeHtml(formatEstado(pedido.estado)) + '</span></td>' +
+              '<td><div class="actions">' + (botones || '—') + '</div></td>';
+            pedidosBody.appendChild(fila);
+          });
+        } catch (error) {
+          showMessage(error.message || 'No se pudieron cargar los pedidos', 'error');
+        }
+      }
+
+      itemForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const producto = productosPorId[productoSelect.value];
+        const cantidad = Number(itemForm.cantidad.value);
+
+        if (!producto) {
+          showMessage('Selecciona un producto', 'error');
+          return;
+        }
+
+        if (!Number.isInteger(cantidad) || cantidad < 1) {
+          showMessage('La cantidad debe ser mayor a cero', 'error');
+          return;
+        }
+
+        const existente = carrito.find((item) => item.producto_id === producto.id);
+
+        if (existente) {
+          existente.cantidad += cantidad;
+        } else {
+          carrito.push({
+            producto_id: producto.id,
+            nombre_producto: producto.nombre,
+            precio_unitario: Number(producto.precio),
+            cantidad,
+          });
+        }
+
+        itemForm.cantidad.value = 1;
+        renderCarrito();
+      });
+
+      carritoBody.addEventListener('click', (event) => {
+        const boton = event.target.closest('button[data-quitar]');
+
+        if (!boton) {
+          return;
+        }
+
+        carrito.splice(Number(boton.dataset.quitar), 1);
+        renderCarrito();
+      });
+
+      registrarPedido.addEventListener('click', async () => {
+        const mesaId = Number(mesaSelect.value);
+
+        if (!mesaId) {
+          showMessage('Selecciona una mesa', 'error');
+          return;
+        }
+
+        if (!carrito.length) {
+          showMessage('Agrega al menos un producto', 'error');
+          return;
+        }
+
+        registrarPedido.disabled = true;
+
+        try {
+          await api.pedidos.crear({ mesa_id: mesaId, productos: carrito });
+          showMessage('Pedido registrado', 'success');
+          carrito = [];
+          renderCarrito();
+          await cargarPedidos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo registrar el pedido', 'error');
+        } finally {
+          registrarPedido.disabled = false;
+        }
+      });
+
+      pedidosBody.addEventListener('click', async (event) => {
+        const boton = event.target.closest('button[data-estado]');
+
+        if (!boton) {
+          return;
+        }
+
+        boton.disabled = true;
+
+        try {
+          await api.pedidos.cambiarEstado(boton.dataset.id, boton.dataset.estado);
+          showMessage('Pedido actualizado', 'success');
+          await cargarPedidos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo actualizar el pedido', 'error');
+          boton.disabled = false;
+        }
+      });
+
+      (async () => {
+        renderCarrito();
+        await cargarOpciones();
+        await cargarPedidos();
+      })();
     }
-
-    pedidoForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      if (!validateRequired(pedidoForm)) {
-        return;
-      }
-
-      const pedido = {
-        mesa_id: pedidoForm.mesa_id.value,
-        producto_id: pedidoForm.producto_id.value,
-        cantidad: pedidoForm.cantidad.value,
-      };
-
-      try {
-        await api.pedidos.crear(pedido);
-        showMessage('Pedido registrado', 'success');
-        cargarPedidos();
-      } catch (error) {
-        showMessage(error.message || 'No se pudo registrar el pedido', 'error');
-      }
-    });
-
-    cargarOpciones();
-    cargarPedidos();
   </script>
 </body>
 </html>
