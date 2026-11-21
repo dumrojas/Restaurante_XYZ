@@ -2,7 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Models\DetallePedido;
 use App\Models\Pedido;
+use Illuminate\Database\Capsule\Manager as Capsule;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -46,11 +48,18 @@ class PedidoController
             return $this->json($response, ['error' => 'La mesa es obligatoria'], 422);
         }
 
+        $errorMesa = $this->validarMesa($mesaId);
+
+        if ($errorMesa !== null) {
+            return $this->json($response, ['error' => $errorMesa], 422);
+        }
+
         if (count($items) === 0) {
             return $this->json($response, ['error' => 'El pedido no puede estar vacío'], 422);
         }
 
         $total = 0;
+        $cantidadTotal = 0;
         $detalles = [];
 
         foreach ($items as $item) {
@@ -68,6 +77,7 @@ class PedidoController
 
             $subtotal = $cantidad * $precio;
             $total += $subtotal;
+            $cantidadTotal += $cantidad;
 
             $detalles[] = [
                 'producto_id' => $productoId,
@@ -84,12 +94,82 @@ class PedidoController
             'hora' => $data['hora'] ?? date('H:i:s'),
             'subtotal' => $total,
             'total' => $total,
+            'cantidad_total' => $cantidadTotal,
             'estado' => 'pendiente',
         ]);
 
         $pedido->detalles()->createMany($detalles);
 
         return $this->json($response, $pedido->load('detalles')->toArray(), 201);
+    }
+
+    public function agregarProducto(Request $request, Response $response, array $args): Response
+    {
+        $pedido = Pedido::find((int) $args['id']);
+
+        if (!$pedido) {
+            return $this->json($response, ['error' => 'Pedido no encontrado'], 404);
+        }
+
+        $data = (array) $request->getParsedBody();
+        $productoId = (int) ($data['producto_id'] ?? 0);
+        $cantidad = (int) ($data['cantidad'] ?? 1);
+
+        if ($productoId <= 0) {
+            return $this->json($response, ['error' => 'El producto es obligatorio'], 422);
+        }
+
+        if ($cantidad < 1) {
+            return $this->json($response, ['error' => 'Las cantidades deben ser mayores a cero'], 422);
+        }
+
+        $precio = (float) ($data['precio_unitario'] ?? 0);
+
+        $pedido->detalles()->create([
+            'producto_id' => $productoId,
+            'nombre_producto' => $data['nombre_producto'] ?? ('Producto ' . $productoId),
+            'cantidad' => $cantidad,
+            'precio_unitario' => $precio,
+            'subtotal' => $cantidad * $precio,
+        ]);
+
+        return $this->json($response, $this->recalcular($pedido)->toArray(), 201);
+    }
+
+    public function cambiarCantidad(Request $request, Response $response, array $args): Response
+    {
+        $detalle = $this->detalle((int) $args['id'], (int) $args['detalleId']);
+
+        if (!$detalle) {
+            return $this->json($response, ['error' => 'Producto del pedido no encontrado'], 404);
+        }
+
+        $data = (array) $request->getParsedBody();
+        $cantidad = (int) ($data['cantidad'] ?? 0);
+
+        if ($cantidad < 1) {
+            return $this->json($response, ['error' => 'Las cantidades deben ser mayores a cero'], 422);
+        }
+
+        $detalle->cantidad = $cantidad;
+        $detalle->subtotal = $cantidad * (float) $detalle->precio_unitario;
+        $detalle->save();
+
+        return $this->json($response, $this->recalcular($detalle->pedido)->toArray());
+    }
+
+    public function eliminarProducto(Request $request, Response $response, array $args): Response
+    {
+        $detalle = $this->detalle((int) $args['id'], (int) $args['detalleId']);
+
+        if (!$detalle) {
+            return $this->json($response, ['error' => 'Producto del pedido no encontrado'], 404);
+        }
+
+        $pedido = $detalle->pedido;
+        $detalle->delete();
+
+        return $this->json($response, $this->recalcular($pedido)->toArray());
     }
 
     public function updateEstado(Request $request, Response $response, array $args): Response
@@ -110,7 +190,48 @@ class PedidoController
         $pedido->estado = $estado;
         $pedido->save();
 
-        return $this->json($response, $pedido->toArray());
+        return $this->json($response, $pedido->load('detalles')->toArray());
+    }
+
+    private function detalle(int $pedidoId, int $detalleId): ?DetallePedido
+    {
+        return DetallePedido::where('pedido_id', $pedidoId)->where('id', $detalleId)->first();
+    }
+
+    private function recalcular(Pedido $pedido): Pedido
+    {
+        $total = 0;
+        $cantidadTotal = 0;
+
+        foreach ($pedido->detalles as $detalle) {
+            $total += (float) $detalle->subtotal;
+            $cantidadTotal += (int) $detalle->cantidad;
+        }
+
+        $pedido->subtotal = $total;
+        $pedido->total = $total;
+        $pedido->cantidad_total = $cantidadTotal;
+        $pedido->save();
+
+        return $pedido->load('detalles');
+    }
+
+    private function validarMesa(int $mesaId): ?string
+    {
+        $mesa = Capsule::connection('reservas')
+            ->table('mesas')
+            ->where('id', $mesaId)
+            ->first();
+
+        if (!$mesa) {
+            return 'La mesa no existe';
+        }
+
+        if (!in_array($mesa->estado, ['reservada', 'ocupada'], true)) {
+            return 'No se pueden registrar pedidos para mesas disponibles';
+        }
+
+        return null;
     }
 
     private function items(array $data): array

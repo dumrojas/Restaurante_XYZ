@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
     hora TIME NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0,
     total DECIMAL(10,2) NOT NULL DEFAULT 0,
+    cantidad_total INT NOT NULL DEFAULT 0,
     estado ENUM('pendiente', 'en_preparacion', 'entregado', 'pagado', 'cancelado') DEFAULT 'pendiente',
     created_at TIMESTAMP NULL DEFAULT NULL,
     updated_at TIMESTAMP NULL DEFAULT NULL
@@ -28,10 +29,12 @@ CREATE TABLE IF NOT EXISTS detalles_pedidos (
     CONSTRAINT fk_detalles_pedidos_pedidos FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
 );
 
+ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS cantidad_total INT NOT NULL DEFAULT 0;
+
 INSERT INTO pedidos (
-    mesa_id, fecha, hora, subtotal, total, estado, created_at, updated_at
+    mesa_id, fecha, hora, subtotal, total, cantidad_total, estado, created_at, updated_at
 ) VALUES
-(1, '2026-06-10', '20:00:00', 36000, 36000, 'pendiente', NOW(), NOW());
+(1, '2026-06-10', '20:00:00', 36000, 36000, 2, 'pendiente', NOW(), NOW());
 
 INSERT INTO detalles_pedidos (
     pedido_id, producto_id, nombre_producto, cantidad, precio_unitario, subtotal, created_at, updated_at
