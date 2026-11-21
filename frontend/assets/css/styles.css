@@ -65,6 +65,12 @@ body {
   border-bottom: 2px solid var(--primary);
 }
 
+.navbar .nav-user {
+  padding: 0.9rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 /* Contenedor principal */
 .container {
   max-width: 960px;
@@ -138,6 +144,79 @@ textarea:focus {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
+}
+
+.btn-small {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.btn-danger {
+  background: var(--error);
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* Estados */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.badge-disponible,
+.badge-pagado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-ocupada,
+.badge-en_preparacion {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-reservada,
+.badge-pendiente {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-fuera_servicio,
+.badge-cancelado,
+.badge-cancelada {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-entregado,
+.badge-confirmada,
+.badge-finalizada {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.cart-total {
+  margin: 0.75rem 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
 }
 
 /* Tablas */

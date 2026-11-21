@@ -18,6 +18,14 @@ function renderNav(active) {
   nav.appendChild(brand);
 
   const ul = document.createElement('ul');
+  const usuario = TokenStore.getUser();
+
+  if (usuario && usuario.nombre) {
+    const li = document.createElement('li');
+    li.className = 'nav-user';
+    li.textContent = usuario.nombre;
+    ul.appendChild(li);
+  }
 
   links.forEach((link) => {
     const li = document.createElement('li');
