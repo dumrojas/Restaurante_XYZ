@@ -7,12 +7,23 @@
 </head>
 <body>
   <p>Redirigiendo...</p>
+  <script src="assets/js/api/api.js"></script>
   <script>
-    if (localStorage.getItem('restaurante_token')) {
-      window.location.href = 'pages/reservas/reservas.html';
-    } else {
-      window.location.href = 'pages/auth/login.html';
-    }
+    (async () => {
+      if (!TokenStore.get()) {
+        window.location.replace('pages/auth/login.html');
+        return;
+      }
+
+      try {
+        const respuesta = await api.auth.sesion();
+        TokenStore.setUser(respuesta.usuario);
+        window.location.replace('pages/reservas/reservas.html');
+      } catch (error) {
+        TokenStore.clear();
+        window.location.replace('pages/auth/login.html');
+      }
+    })();
   </script>
 </body>
 </html>
