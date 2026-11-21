@@ -7,23 +7,94 @@
   <link rel="stylesheet" href="../../assets/css/styles.css">
 </head>
 <body>
-  <div class="container">
-    <section class="card">
-      <h2>Mesas</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Número</th>
-            <th>Capacidad</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody id="mesas-body"></tbody>
-      </table>
-    </section>
+  <div class="container split">
+    <header class="page-head">
+      <h1>Reservas</h1>
+      <p>Mesas del salón y reservas del servicio.</p>
+    </header>
+
+    <div class="stack">
+      <section class="card">
+        <h2>Mesas</h2>
+        <div class="mesa-grid" id="mesas-body"></div>
+
+        <form id="mesa-form" class="form-block">
+          <div class="form-grid">
+            <label>
+              Número o nombre
+              <input type="text" name="numero" required>
+            </label>
+            <label>
+              Capacidad
+              <input type="number" name="capacidad" min="1" required>
+            </label>
+            <label>
+              Estado
+              <select name="estado">
+                <option value="disponible">Disponible</option>
+                <option value="reservada">Reservada</option>
+                <option value="ocupada">Ocupada</option>
+                <option value="fuera_servicio">Fuera de servicio</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-small btn-secondary" id="cancelar-mesa" hidden>Cancelar edición</button>
+            <button type="submit" class="btn btn-small" id="guardar-mesa">Guardar mesa</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <section class="card">
-      <h2>Reservas</h2>
+      <h2>Reservas del servicio</h2>
+
+      <form id="filtro-form" class="form-block">
+        <div class="form-grid">
+          <label>
+            Fecha
+            <input type="date" name="fecha">
+          </label>
+          <label>
+            Cliente
+            <input type="text" name="cliente" placeholder="Buscar por cliente">
+          </label>
+          <label>
+            Estado
+            <select name="estado">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="finalizada">Finalizada</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-small btn-secondary" id="limpiar-filtro">Limpiar</button>
+          <button type="submit" class="btn btn-small">Buscar</button>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Hora</th>
+              <th>Mesa</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="reservas-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card full">
+      <h2 id="titulo-reserva">Nueva reserva</h2>
       <form id="reserva-form">
         <div class="form-grid">
           <label>
@@ -55,23 +126,11 @@
             <input type="text" name="observaciones">
           </label>
         </div>
-        <p style="margin-top: 1rem;">
-          <button type="submit" class="btn">Guardar reserva</button>
-        </p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-small btn-secondary" id="cancelar-reserva" hidden>Cancelar edición</button>
+          <button type="submit" class="btn" id="guardar-reserva">Guardar reserva</button>
+        </div>
       </form>
-      <table>
-        <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Fecha</th>
-            <th>Hora</th>
-            <th>Mesa</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="reservas-body"></tbody>
-      </table>
     </section>
   </div>
 
@@ -83,9 +142,16 @@
       renderNav('reservas');
 
       const mesasBody = document.getElementById('mesas-body');
+      const mesaForm = document.getElementById('mesa-form');
+      const guardarMesa = document.getElementById('guardar-mesa');
+      const cancelarMesa = document.getElementById('cancelar-mesa');
       const reservasBody = document.getElementById('reservas-body');
       const mesaSelect = document.getElementById('mesa-select');
       const reservaForm = document.getElementById('reserva-form');
+      const guardarReserva = document.getElementById('guardar-reserva');
+      const cancelarReserva = document.getElementById('cancelar-reserva');
+      const tituloReserva = document.getElementById('titulo-reserva');
+      const filtroForm = document.getElementById('filtro-form');
 
       const hoy = new Date();
       const fechaMinima = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
@@ -93,35 +159,72 @@
         .slice(0, 10);
       reservaForm.fecha.min = fechaMinima;
 
+      const estadosMesa = ['disponible', 'reservada', 'ocupada', 'fuera_servicio'];
       let mesasPorId = {};
+      let reservasPorId = {};
+      let filtrosActuales = {};
+      let editandoMesaId = null;
+      let editandoReservaId = null;
 
       function nombreMesa(id) {
         return mesasPorId[id] ? mesasPorId[id].numero : 'Mesa ' + id;
       }
 
+      function opcionesEstadoMesa(seleccionado) {
+        return estadosMesa
+          .map((estado) =>
+            '<option value="' + estado + '"' + (estado === seleccionado ? ' selected' : '') + '>' +
+              escapeHtml(formatEstado(estado)) + '</option>'
+          )
+          .join('');
+      }
+
+      function reiniciarFormularioMesa() {
+        editandoMesaId = null;
+        mesaForm.reset();
+        guardarMesa.textContent = 'Guardar mesa';
+        cancelarMesa.hidden = true;
+      }
+
       async function cargarMesas() {
         try {
           const mesas = await api.reservas.mesas();
+          const mesaSeleccionada = mesaSelect.value;
 
           mesasPorId = {};
           mesasBody.innerHTML = '';
           mesaSelect.innerHTML = '<option value="">Selecciona una mesa</option>';
 
           if (!mesas.length) {
-            mesasBody.innerHTML = '<tr><td colspan="3" class="empty">No hay mesas registradas</td></tr>';
+            mesasBody.innerHTML = '<p class="empty">No hay mesas registradas</p>';
             return;
           }
 
           mesas.forEach((mesa) => {
             mesasPorId[mesa.id] = mesa;
 
-            const fila = document.createElement('tr');
-            fila.innerHTML =
-              '<td>' + escapeHtml(mesa.numero) + '</td>' +
-              '<td>' + escapeHtml(mesa.capacidad) + ' personas</td>' +
-              '<td><span class="badge badge-' + escapeHtml(mesa.estado) + '">' +
-                escapeHtml(formatEstado(mesa.estado)) + '</span></td>';
-            mesasBody.appendChild(fila);
+            const numero = String(mesa.numero).replace(/\D/g, '') || mesa.numero;
+            const tarjeta = document.createElement('div');
+            tarjeta.className = 'mesa-card';
+            tarjeta.innerHTML =
+              '<div class="mesa-line">' +
+                '<div class="mesa-tag">' + escapeHtml(numero) + '</div>' +
+                '<div class="mesa-info">' +
+                  '<span class="mesa-name">' + escapeHtml(mesa.numero) + '</span>' +
+                  '<span class="mesa-cap">' + escapeHtml(mesa.capacidad) + ' personas</span>' +
+                '</div>' +
+                '<span class="badge badge-' + escapeHtml(mesa.estado) + '">' +
+                  escapeHtml(formatEstado(mesa.estado)) + '</span>' +
+              '</div>' +
+              '<div class="mesa-actions">' +
+                '<button type="button" class="btn btn-small btn-secondary" data-mesa-editar="' +
+                  mesa.id + '">Editar</button>' +
+                '<select class="estado-mesa" data-mesa-estado="' + mesa.id + '">' +
+                  opcionesEstadoMesa(mesa.estado) + '</select>' +
+                '<button type="button" class="btn btn-small" data-mesa-cambiar="' +
+                  mesa.id + '">Aplicar</button>' +
+              '</div>';
+            mesasBody.appendChild(tarjeta);
 
             const opcion = document.createElement('option');
             opcion.value = mesa.id;
@@ -133,6 +236,10 @@
 
             mesaSelect.appendChild(opcion);
           });
+
+          if (mesaSeleccionada) {
+            mesaSelect.value = mesaSeleccionada;
+          }
         } catch (error) {
           showMessage(error.message || 'No se pudieron cargar las mesas', 'error');
         }
@@ -140,9 +247,10 @@
 
       async function cargarReservas() {
         try {
-          const reservas = await api.reservas.reservas();
+          const reservas = await api.reservas.reservas(filtrosActuales);
 
           reservasBody.innerHTML = '';
+          reservasPorId = {};
 
           if (!reservas.length) {
             reservasBody.innerHTML = '<tr><td colspan="6" class="empty">No hay reservas registradas</td></tr>';
@@ -150,7 +258,15 @@
           }
 
           reservas.forEach((reserva) => {
+            reservasPorId[reserva.id] = reserva;
             const acciones = [];
+
+            if (reserva.estado === 'pendiente' || reserva.estado === 'confirmada') {
+              acciones.push(
+                '<button type="button" class="btn btn-small btn-secondary" data-accion="editar" data-id="' +
+                  reserva.id + '">Editar</button>'
+              );
+            }
 
             if (reserva.estado === 'pendiente') {
               acciones.push(
@@ -189,10 +305,112 @@
         }
       }
 
+      mesasBody.addEventListener('click', async (event) => {
+        const editar = event.target.closest('button[data-mesa-editar]');
+        const cambiar = event.target.closest('button[data-mesa-cambiar]');
+
+        if (editar) {
+          const mesa = mesasPorId[editar.dataset.mesaEditar];
+
+          if (!mesa) {
+            return;
+          }
+
+          editandoMesaId = mesa.id;
+          mesaForm.numero.value = mesa.numero;
+          mesaForm.capacidad.value = mesa.capacidad;
+          mesaForm.estado.value = mesa.estado;
+          guardarMesa.textContent = 'Actualizar mesa';
+          cancelarMesa.hidden = false;
+          mesaForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        if (cambiar) {
+          const id = cambiar.dataset.mesaCambiar;
+          const select = mesasBody.querySelector('select[data-mesa-estado="' + id + '"]');
+
+          cambiar.disabled = true;
+
+          try {
+            await api.reservas.cambiarEstadoMesa(id, select.value);
+            showMessage('Estado de la mesa actualizado', 'success');
+            await cargarMesas();
+          } catch (error) {
+            showMessage(error.message || 'No se pudo cambiar el estado', 'error');
+            cambiar.disabled = false;
+          }
+        }
+      });
+
+      cancelarMesa.addEventListener('click', reiniciarFormularioMesa);
+
+      mesaForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        if (!validateRequired(mesaForm)) {
+          return;
+        }
+
+        const capacidad = Number(mesaForm.capacidad.value);
+
+        if (!Number.isInteger(capacidad) || capacidad < 1) {
+          showMessage('La capacidad debe ser mayor a cero', 'error');
+          return;
+        }
+
+        const mesa = {
+          numero: mesaForm.numero.value.trim(),
+          capacidad,
+          estado: mesaForm.estado.value,
+        };
+
+        guardarMesa.disabled = true;
+
+        try {
+          if (editandoMesaId) {
+            await api.reservas.actualizarMesa(editandoMesaId, mesa);
+            showMessage('Mesa actualizada', 'success');
+          } else {
+            await api.reservas.crearMesa(mesa);
+            showMessage('Mesa guardada', 'success');
+          }
+
+          reiniciarFormularioMesa();
+          await cargarMesas();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo guardar la mesa', 'error');
+        } finally {
+          guardarMesa.disabled = false;
+        }
+      });
+
       reservasBody.addEventListener('click', async (event) => {
         const boton = event.target.closest('button[data-accion]');
 
         if (!boton) {
+          return;
+        }
+
+        if (boton.dataset.accion === 'editar') {
+          const reserva = reservasPorId[boton.dataset.id];
+
+          if (!reserva) {
+            return;
+          }
+
+          editandoReservaId = reserva.id;
+          reservaForm.nombre_cliente.value = reserva.nombre_cliente;
+          reservaForm.telefono_cliente.value = reserva.telefono_cliente;
+          reservaForm.cantidad_personas.value = reserva.cantidad_personas;
+          reservaForm.fecha.value = reserva.fecha;
+          reservaForm.hora.value = String(reserva.hora).slice(0, 5);
+          mesaSelect.value = reserva.mesa_id;
+          reservaForm.observaciones.value = reserva.observaciones || '';
+          tituloReserva.textContent = 'Editar reserva';
+          guardarReserva.textContent = 'Actualizar reserva';
+          cancelarReserva.hidden = false;
+          reservaForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
 
@@ -214,6 +432,17 @@
         }
       });
 
+      function reiniciarFormularioReserva() {
+        editandoReservaId = null;
+        reservaForm.reset();
+        reservaForm.fecha.min = fechaMinima;
+        tituloReserva.textContent = 'Nueva reserva';
+        guardarReserva.textContent = 'Guardar reserva';
+        cancelarReserva.hidden = true;
+      }
+
+      cancelarReserva.addEventListener('click', reiniciarFormularioReserva);
+
       reservaForm.addEventListener('submit', async (event) => {
         event.preventDefault();
 
@@ -231,16 +460,40 @@
           observaciones: reservaForm.observaciones.value.trim(),
         };
 
+        guardarReserva.disabled = true;
+
         try {
-          await api.reservas.crearReserva(reserva);
-          showMessage('Reserva guardada', 'success');
-          reservaForm.reset();
-          reservaForm.fecha.min = fechaMinima;
+          if (editandoReservaId) {
+            await api.reservas.actualizarReserva(editandoReservaId, reserva);
+            showMessage('Reserva actualizada', 'success');
+          } else {
+            await api.reservas.crearReserva(reserva);
+            showMessage('Reserva guardada', 'success');
+          }
+
+          reiniciarFormularioReserva();
           await cargarReservas();
-          await cargarMesas();
         } catch (error) {
           showMessage(error.message || 'No se pudo guardar la reserva', 'error');
+        } finally {
+          guardarReserva.disabled = false;
         }
+      });
+
+      filtroForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        filtrosActuales = {
+          fecha: filtroForm.fecha.value,
+          cliente: filtroForm.cliente.value.trim(),
+          estado: filtroForm.estado.value,
+        };
+        cargarReservas();
+      });
+
+      document.getElementById('limpiar-filtro').addEventListener('click', () => {
+        filtroForm.reset();
+        filtrosActuales = {};
+        cargarReservas();
       });
 
       (async () => {

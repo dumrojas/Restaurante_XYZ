@@ -8,23 +8,25 @@
 </head>
 <body>
   <div class="login-wrap">
-    <div class="card login-card">
-      <h1>Restaurante XYZ</h1>
-      <form id="login-form">
-        <div class="form-grid">
-          <label>
-            Usuario o correo
-            <input type="text" name="usuario" required autocomplete="username">
-          </label>
-          <label>
-            Contraseña
-            <input type="password" name="contrasena" required autocomplete="current-password">
-          </label>
-        </div>
-        <p style="margin-top: 1rem;">
-          <button type="submit" class="btn" style="width: 100%;">Ingresar</button>
-        </p>
-      </form>
+    <div class="login-shell">
+      <div class="login-card">
+        <h2>Iniciar sesión</h2>
+        <p class="login-sub">Ingresa con tu cuenta para abrir el servicio.</p>
+
+        <form id="login-form">
+          <div class="form-grid">
+            <label>
+              Usuario o correo
+              <input type="text" name="usuario" required autocomplete="username">
+            </label>
+            <label>
+              Contraseña
+              <input type="password" name="contrasena" required autocomplete="current-password">
+            </label>
+          </div>
+          <button type="submit" class="btn">Ingresar</button>
+        </form>
+      </div>
     </div>
   </div>
 
