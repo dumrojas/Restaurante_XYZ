@@ -19,10 +19,9 @@ frontend/
 │   ├── reservas/     # mesas y reservas
 │   ├── productos/    # menú
 │   └── pedidos/      # pedidos
-└── docs/             # documentación de endpoints
 ```
 
-Por ahora solo están creadas las carpetas base. El código se va agregando en los siguientes commits.
+La documentación de los endpoints está en `../docs/endpoints.md`.
 
 ## Conexión con el backend
 

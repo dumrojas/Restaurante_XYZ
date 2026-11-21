@@ -6,3 +6,4 @@ Sistema web para la gestión de reservas de mesas y pedidos de un restaurante.
 
 - `frontend/` : interfaz de usuario (HTML5, CSS3 y JavaScript Vanilla).
 - `backend/` : microservicios en PHP 8 con Slim Framework y Eloquent ORM.
+- `docs/endpoints.md` : documentación de los endpoints REST.

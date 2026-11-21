@@ -28,7 +28,11 @@ Los scripts están en `backend/<servicio>/database/schema.sql`:
 mysql -u root < backend/ms-auth/database/schema.sql
 ```
 
-## Endpoints base
+## Endpoints
+
+La documentación completa de todos los endpoints está en `../docs/endpoints.md`.
+
+### Endpoints base
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
