@@ -145,6 +145,12 @@ const api = {
     listar: (filtros) => request('pedidos', '/pedidos' + queryString(filtros)),
     obtener: (id) => request('pedidos', '/pedidos/' + id),
     crear: (pedido) => request('pedidos', '/pedidos', conCuerpo('POST', pedido)),
+    agregarProducto: (id, producto) =>
+      request('pedidos', '/pedidos/' + id + '/productos', conCuerpo('POST', producto)),
+    cambiarCantidad: (id, detalleId, cantidad) =>
+      request('pedidos', '/pedidos/' + id + '/productos/' + detalleId, conCuerpo('PUT', { cantidad })),
+    eliminarProducto: (id, detalleId) =>
+      request('pedidos', '/pedidos/' + id + '/productos/' + detalleId, { method: 'DELETE' }),
     cambiarEstado: (id, estado) =>
       request('pedidos', '/pedidos/' + id + '/estado', conCuerpo('PATCH', { estado })),
   },

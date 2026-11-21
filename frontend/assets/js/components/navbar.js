@@ -5,7 +5,6 @@ function renderNav(active) {
     { id: 'reservas', href: '../reservas/reservas.html', label: 'Reservas' },
     { id: 'productos', href: '../productos/productos.html', label: 'Productos' },
     { id: 'pedidos', href: '../pedidos/pedidos.html', label: 'Pedidos' },
-    { id: 'logout', href: '#', label: 'Cerrar sesión' },
   ];
 
   const nav = document.createElement('nav');
@@ -18,6 +17,21 @@ function renderNav(active) {
   nav.appendChild(brand);
 
   const ul = document.createElement('ul');
+
+  links.forEach((link) => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.textContent = link.label;
+
+    if (link.id === active) {
+      a.className = 'active';
+    }
+
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+
   const usuario = TokenStore.getUser();
 
   if (usuario && usuario.nombre) {
@@ -27,26 +41,18 @@ function renderNav(active) {
     ul.appendChild(li);
   }
 
-  links.forEach((link) => {
-    const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.href = link.href;
-    a.textContent = link.label;
-
-    if (link.id === 'logout') {
-      a.addEventListener('click', (event) => {
-        event.preventDefault();
-        logout();
-      });
-    }
-
-    if (link.id === active) {
-      a.className = 'active';
-    }
-
-    li.appendChild(a);
-    ul.appendChild(li);
+  const logoutItem = document.createElement('li');
+  logoutItem.className = 'nav-logout';
+  const logoutLink = document.createElement('a');
+  logoutLink.href = '#';
+  logoutLink.textContent = 'Salir';
+  logoutLink.title = 'Cerrar sesión';
+  logoutLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    logout();
   });
+  logoutItem.appendChild(logoutLink);
+  ul.appendChild(logoutItem);
 
   nav.appendChild(ul);
   document.body.prepend(nav);

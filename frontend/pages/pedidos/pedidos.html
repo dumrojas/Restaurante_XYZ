@@ -8,6 +8,11 @@
 </head>
 <body>
   <div class="container">
+    <header class="page-head">
+      <h1>Pedidos</h1>
+      <p>Arma la comanda de la mesa y sigue su curso hasta el pago.</p>
+    </header>
+
     <section class="card">
       <h2>Nuevo pedido</h2>
       <form id="item-form">
@@ -25,43 +30,111 @@
             <input type="number" name="cantidad" min="1" value="1" required>
           </label>
         </div>
-        <p style="margin-top: 1rem;">
+        <p class="hint">Solo se pueden registrar pedidos para mesas reservadas u ocupadas.</p>
+        <div class="form-actions">
           <button type="submit" class="btn btn-secondary">Agregar producto</button>
-        </p>
+        </div>
       </form>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Producto</th>
-            <th>Precio</th>
-            <th>Cantidad</th>
-            <th>Subtotal</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="carrito-body"></tbody>
-      </table>
-      <p class="cart-total" id="carrito-total">Total: $0</p>
-      <p style="text-align: right;">
-        <button type="button" class="btn" id="registrar-pedido">Registrar pedido</button>
-      </p>
+      <div class="ticket">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Precio</th>
+                <th>Cantidad</th>
+                <th>Subtotal</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="carrito-body"></tbody>
+          </table>
+        </div>
+        <div class="cart-footer">
+          <div>
+            <span class="cart-total" id="carrito-total">Total: $0</span>
+            <span class="cart-cantidad" id="carrito-cantidad">0 productos</span>
+          </div>
+          <button type="button" class="btn" id="registrar-pedido">Registrar pedido</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="gestion-card" hidden>
+      <h2>Gestionar pedido <span id="gestion-id"></span></h2>
+
+      <form id="agregar-item-form" class="form-block">
+        <div class="form-grid">
+          <label>
+            Producto
+            <select name="producto_id" id="gestion-producto" required></select>
+          </label>
+          <label>
+            Cantidad
+            <input type="number" name="cantidad" min="1" value="1" required>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-small">Agregar al pedido</button>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Precio</th>
+              <th>Cantidad</th>
+              <th>Subtotal</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="detalle-body"></tbody>
+        </table>
+      </div>
+      <p class="cart-total" id="gestion-total">Total: $0</p>
     </section>
 
     <section class="card">
       <h2>Pedidos registrados</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Mesa</th>
-            <th>Productos</th>
-            <th>Total</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="pedidos-body"></tbody>
-      </table>
+
+      <form id="filtro-form" class="form-block">
+        <div class="form-grid">
+          <label>
+            Estado
+            <select name="estado" id="filtro-estado">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="en_preparacion">En preparación</option>
+              <option value="entregado">Entregado</option>
+              <option value="pagado">Pagado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-small btn-secondary" id="limpiar-filtro">Limpiar</button>
+          <button type="submit" class="btn btn-small">Buscar</button>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mesa</th>
+              <th>Productos</th>
+              <th>Total</th>
+              <th>Cantidad</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="pedidos-body"></tbody>
+        </table>
+      </div>
     </section>
   </div>
 
@@ -78,11 +151,22 @@
       const productoSelect = document.getElementById('producto-select');
       const carritoBody = document.getElementById('carrito-body');
       const carritoTotal = document.getElementById('carrito-total');
+      const carritoCantidad = document.getElementById('carrito-cantidad');
       const registrarPedido = document.getElementById('registrar-pedido');
+      const filtroForm = document.getElementById('filtro-form');
+      const filtroEstado = document.getElementById('filtro-estado');
+      const gestionCard = document.getElementById('gestion-card');
+      const gestionId = document.getElementById('gestion-id');
+      const gestionProducto = document.getElementById('gestion-producto');
+      const agregarItemForm = document.getElementById('agregar-item-form');
+      const detalleBody = document.getElementById('detalle-body');
+      const gestionTotal = document.getElementById('gestion-total');
 
       let mesasPorId = {};
       let productosPorId = {};
       let carrito = [];
+      let filtrosActuales = {};
+      let gestionPedidoId = null;
 
       function nombreMesa(id) {
         return mesasPorId[id] ? mesasPorId[id].numero : 'Mesa ' + id;
@@ -95,20 +179,25 @@
           carritoBody.innerHTML =
             '<tr><td colspan="5" class="empty">Agrega productos para armar el pedido</td></tr>';
           carritoTotal.textContent = 'Total: $0';
+          carritoCantidad.textContent = '0 productos';
           return;
         }
 
         let total = 0;
+        let unidades = 0;
 
         carrito.forEach((item, indice) => {
           const subtotal = item.precio_unitario * item.cantidad;
           total += subtotal;
+          unidades += item.cantidad;
 
           const fila = document.createElement('tr');
           fila.innerHTML =
             '<td>' + escapeHtml(item.nombre_producto) + '</td>' +
             '<td>' + escapeHtml(formatMoney(item.precio_unitario)) + '</td>' +
-            '<td>' + item.cantidad + '</td>' +
+            '<td><input type="number" min="1" value="' + item.cantidad + '" ' +
+              'data-cantidad="' + indice + '" aria-label="Cantidad de ' +
+              escapeHtml(item.nombre_producto) + '"></td>' +
             '<td>' + escapeHtml(formatMoney(subtotal)) + '</td>' +
             '<td><button type="button" class="btn btn-small btn-danger" ' +
               'data-quitar="' + indice + '">Quitar</button></td>';
@@ -116,43 +205,52 @@
         });
 
         carritoTotal.textContent = 'Total: ' + formatMoney(total);
+        carritoCantidad.textContent = unidades + (unidades === 1 ? ' producto' : ' productos');
+      }
+
+      function productosDisponibles() {
+        return api.productos.listar({ disponible: true });
+      }
+
+      function llenarSelectProductos(select, productos) {
+        select.innerHTML = '<option value="">Selecciona un producto</option>';
+
+        productos.forEach((producto) => {
+          productosPorId[producto.id] = producto;
+
+          const opcion = document.createElement('option');
+          opcion.value = producto.id;
+          opcion.textContent = producto.nombre + ' - ' + formatMoney(producto.precio);
+          select.appendChild(opcion);
+        });
       }
 
       async function cargarOpciones() {
         try {
           const [mesas, productos] = await Promise.all([
             api.reservas.mesas(),
-            api.productos.listar({ disponible: true }),
+            productosDisponibles(),
           ]);
 
           mesasPorId = {};
-          productosPorId = {};
-
           mesaSelect.innerHTML = '<option value="">Selecciona una mesa</option>';
-          productoSelect.innerHTML = '<option value="">Selecciona un producto</option>';
 
           mesas.forEach((mesa) => {
             mesasPorId[mesa.id] = mesa;
 
             const opcion = document.createElement('option');
             opcion.value = mesa.id;
-            opcion.textContent = mesa.numero + ' (' + mesa.capacidad + ' personas)';
+            opcion.textContent = mesa.numero + ' (' + formatEstado(mesa.estado) + ')';
 
-            if (mesa.estado === 'fuera_servicio') {
+            if (mesa.estado === 'disponible' || mesa.estado === 'fuera_servicio') {
               opcion.disabled = true;
             }
 
             mesaSelect.appendChild(opcion);
           });
 
-          productos.forEach((producto) => {
-            productosPorId[producto.id] = producto;
-
-            const opcion = document.createElement('option');
-            opcion.value = producto.id;
-            opcion.textContent = producto.nombre + ' - ' + formatMoney(producto.precio);
-            productoSelect.appendChild(opcion);
-          });
+          llenarSelectProductos(productoSelect, productos);
+          llenarSelectProductos(gestionProducto, productos);
         } catch (error) {
           showMessage(error.message || 'No se pudieron cargar las opciones', 'error');
         }
@@ -160,12 +258,12 @@
 
       async function cargarPedidos() {
         try {
-          const pedidos = await api.pedidos.listar();
+          const pedidos = await api.pedidos.listar(filtrosActuales);
 
           pedidosBody.innerHTML = '';
 
           if (!pedidos.length) {
-            pedidosBody.innerHTML = '<tr><td colspan="5" class="empty">No hay pedidos registrados</td></tr>';
+            pedidosBody.innerHTML = '<tr><td colspan="6" class="empty">No hay pedidos registrados</td></tr>';
             return;
           }
 
@@ -175,23 +273,27 @@
               .join(', ');
             const acciones = [];
 
+            acciones.push(
+              '<button type="button" class="btn btn-small btn-secondary" data-accion="gestionar" data-id="' +
+                pedido.id + '">Gestionar</button>'
+            );
+
             if (pedido.estado === 'pendiente') {
               acciones.push({ estado: 'en_preparacion', texto: 'Preparar', clase: '' });
+              acciones.push({ estado: 'cancelado', texto: 'Cancelar', clase: ' btn-danger' });
             }
 
             if (pedido.estado === 'en_preparacion') {
               acciones.push({ estado: 'entregado', texto: 'Entregar', clase: '' });
+              acciones.push({ estado: 'cancelado', texto: 'Cancelar', clase: ' btn-danger' });
             }
 
             if (pedido.estado === 'entregado') {
               acciones.push({ estado: 'pagado', texto: 'Pagar', clase: '' });
             }
 
-            if (pedido.estado === 'pendiente' || pedido.estado === 'en_preparacion') {
-              acciones.push({ estado: 'cancelado', texto: 'Cancelar', clase: ' btn-danger' });
-            }
-
-            const botones = acciones
+            const botonesEstado = acciones
+              .filter((accion) => typeof accion === 'object')
               .map(
                 (accion) =>
                   '<button type="button" class="btn btn-small' + accion.clase + '" ' +
@@ -199,19 +301,66 @@
                   accion.texto + '</button>'
               )
               .join('');
+            const botonGestionar = acciones
+              .filter((accion) => typeof accion === 'string')
+              .join('');
 
             const fila = document.createElement('tr');
             fila.innerHTML =
               '<td>' + escapeHtml(nombreMesa(pedido.mesa_id)) + '</td>' +
               '<td>' + escapeHtml(detalle || 'Sin detalle') + '</td>' +
               '<td>' + escapeHtml(formatMoney(pedido.total)) + '</td>' +
+              '<td>' + Number(pedido.cantidad_total || 0) + '</td>' +
               '<td><span class="badge badge-' + escapeHtml(pedido.estado) + '">' +
                 escapeHtml(formatEstado(pedido.estado)) + '</span></td>' +
-              '<td><div class="actions">' + (botones || '—') + '</div></td>';
+              '<td><div class="actions">' + botonGestionar + botonesEstado + '</div></td>';
             pedidosBody.appendChild(fila);
           });
         } catch (error) {
           showMessage(error.message || 'No se pudieron cargar los pedidos', 'error');
+        }
+      }
+
+      async function cargarDetalle(id) {
+        try {
+          const pedido = await api.pedidos.obtener(id);
+
+          gestionPedidoId = pedido.id;
+          gestionId.textContent = '#' + pedido.id + ' — ' + nombreMesa(pedido.mesa_id);
+          gestionCard.hidden = false;
+          detalleBody.innerHTML = '';
+
+          (pedido.detalles || []).forEach((detalle) => {
+            const fila = document.createElement('tr');
+            fila.innerHTML =
+              '<td>' + escapeHtml(detalle.nombre_producto) + '</td>' +
+              '<td>' + escapeHtml(formatMoney(detalle.precio_unitario)) + '</td>' +
+              '<td><input type="number" min="1" value="' + detalle.cantidad + '" ' +
+                'data-detalle-cantidad="' + detalle.id + '" aria-label="Cantidad"></td>' +
+              '<td>' + escapeHtml(formatMoney(detalle.subtotal)) + '</td>' +
+              '<td><div class="actions">' +
+                '<button type="button" class="btn btn-small" data-detalle-accion="actualizar" ' +
+                  'data-id="' + detalle.id + '">Actualizar</button>' +
+                '<button type="button" class="btn btn-small btn-danger" data-detalle-accion="quitar" ' +
+                  'data-id="' + detalle.id + '">Quitar</button>' +
+              '</div></td>';
+            detalleBody.appendChild(fila);
+          });
+
+          if (!(pedido.detalles || []).length) {
+            detalleBody.innerHTML = '<tr><td colspan="5" class="empty">El pedido no tiene productos</td></tr>';
+          }
+
+          gestionTotal.textContent = 'Total: ' + formatMoney(pedido.total) +
+            ' · ' + Number(pedido.cantidad_total || 0) + ' productos';
+        } catch (error) {
+          showMessage(error.message || 'No se pudo consultar el detalle', 'error');
+        }
+      }
+
+      async function recargarGestion() {
+        if (gestionPedidoId) {
+          await cargarDetalle(gestionPedidoId);
         }
       }
 
@@ -259,11 +408,36 @@
         renderCarrito();
       });
 
+      carritoBody.addEventListener('change', (event) => {
+        const input = event.target.closest('input[data-cantidad]');
+
+        if (!input) {
+          return;
+        }
+
+        const cantidad = Number(input.value);
+
+        if (!Number.isInteger(cantidad) || cantidad < 1) {
+          input.value = carrito[Number(input.dataset.cantidad)].cantidad;
+          showMessage('La cantidad debe ser mayor a cero', 'error');
+          return;
+        }
+
+        carrito[Number(input.dataset.cantidad)].cantidad = cantidad;
+        renderCarrito();
+      });
+
       registrarPedido.addEventListener('click', async () => {
         const mesaId = Number(mesaSelect.value);
+        const mesa = mesasPorId[mesaId];
 
         if (!mesaId) {
           showMessage('Selecciona una mesa', 'error');
+          return;
+        }
+
+        if (!mesa || mesa.estado === 'disponible' || mesa.estado === 'fuera_servicio') {
+          showMessage('No se pueden registrar pedidos para mesas disponibles', 'error');
           return;
         }
 
@@ -287,7 +461,86 @@
         }
       });
 
+      agregarItemForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        if (!gestionPedidoId) {
+          return;
+        }
+
+        const producto = productosPorId[gestionProducto.value];
+        const cantidad = Number(agregarItemForm.cantidad.value);
+
+        if (!producto) {
+          showMessage('Selecciona un producto', 'error');
+          return;
+        }
+
+        if (!Number.isInteger(cantidad) || cantidad < 1) {
+          showMessage('La cantidad debe ser mayor a cero', 'error');
+          return;
+        }
+
+        try {
+          await api.pedidos.agregarProducto(gestionPedidoId, {
+            producto_id: producto.id,
+            nombre_producto: producto.nombre,
+            precio_unitario: Number(producto.precio),
+            cantidad,
+          });
+          showMessage('Producto agregado al pedido', 'success');
+          await recargarGestion();
+          await cargarPedidos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo agregar el producto', 'error');
+        }
+      });
+
+      detalleBody.addEventListener('click', async (event) => {
+        const boton = event.target.closest('button[data-detalle-accion]');
+
+        if (!boton || !gestionPedidoId) {
+          return;
+        }
+
+        const detalleId = boton.dataset.id;
+        boton.disabled = true;
+
+        try {
+          if (boton.dataset.detalleAccion === 'actualizar') {
+            const input = detalleBody.querySelector('input[data-detalle-cantidad="' + detalleId + '"]');
+            const cantidad = Number(input.value);
+
+            if (!Number.isInteger(cantidad) || cantidad < 1) {
+              showMessage('La cantidad debe ser mayor a cero', 'error');
+              boton.disabled = false;
+              return;
+            }
+
+            await api.pedidos.cambiarCantidad(gestionPedidoId, detalleId, cantidad);
+            showMessage('Cantidad actualizada', 'success');
+          } else {
+            await api.pedidos.eliminarProducto(gestionPedidoId, detalleId);
+            showMessage('Producto quitado del pedido', 'success');
+          }
+
+          await recargarGestion();
+          await cargarPedidos();
+        } catch (error) {
+          showMessage(error.message || 'No se pudo actualizar el pedido', 'error');
+          boton.disabled = false;
+        }
+      });
+
       pedidosBody.addEventListener('click', async (event) => {
+        const gestionar = event.target.closest('button[data-accion="gestionar"]');
+
+        if (gestionar) {
+          await cargarDetalle(gestionar.dataset.id);
+          gestionCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+
         const boton = event.target.closest('button[data-estado]');
 
         if (!boton) {
@@ -300,10 +553,23 @@
           await api.pedidos.cambiarEstado(boton.dataset.id, boton.dataset.estado);
           showMessage('Pedido actualizado', 'success');
           await cargarPedidos();
+          await recargarGestion();
         } catch (error) {
           showMessage(error.message || 'No se pudo actualizar el pedido', 'error');
           boton.disabled = false;
         }
+      });
+
+      filtroForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        filtrosActuales = { estado: filtroEstado.value };
+        cargarPedidos();
+      });
+
+      document.getElementById('limpiar-filtro').addEventListener('click', () => {
+        filtroForm.reset();
+        filtrosActuales = {};
+        cargarPedidos();
       });
 
       (async () => {
