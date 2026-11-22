@@ -10,6 +10,12 @@ class Pedido extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'mesa_id' => 'integer',
+        'subtotal' => 'float',
+        'total' => 'float',
+    ];
+
     public function detalles()
     {
         return $this->hasMany(DetallePedido::class, 'pedido_id');

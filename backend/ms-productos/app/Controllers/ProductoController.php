@@ -7,36 +7,28 @@ use App\Models\Producto;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
-class ProductoController
+class ProductoController extends Controller
 {
     public function index(Request $request, Response $response): Response
     {
         $params = $request->getQueryParams();
-        $query = Producto::query();
+        $query = Producto::with('categoria');
 
         if (!empty($params['categoria_id'])) {
             $query->where('categoria_id', (int) $params['categoria_id']);
         } elseif (!empty($params['categoria'])) {
-            $categoria = Categoria::where('nombre', $params['categoria'])->first();
-
-            if ($categoria) {
-                $query->where('categoria_id', $categoria->id);
-            } else {
-                $query->whereRaw('0 = 1');
-            }
+            $query->whereHas('categoria', fn ($categoria) => $categoria->where('nombre', $params['categoria']));
         }
 
         if (isset($params['disponible']) && $params['disponible'] !== '') {
-            $query->where('disponible', filter_var($params['disponible'], FILTER_VALIDATE_BOOLEAN));
+            $query->where('disponible', $this->booleano($params['disponible']));
         }
 
         if (!empty($params['buscar'])) {
             $query->where('nombre', 'like', '%' . $params['buscar'] . '%');
         }
 
-        $productos = $query->orderBy('nombre')->get();
-
-        return $this->json($response, $productos->toArray());
+        return $this->json($response, $query->orderBy('nombre')->get()->toArray());
     }
 
     public function store(Request $request, Response $response): Response
@@ -46,8 +38,12 @@ class ProductoController
         $nombre = trim((string) ($data['nombre'] ?? ''));
         $precio = (float) ($data['precio'] ?? 0);
 
-        if ($nombre === '' || $precio <= 0) {
-            return $this->json($response, ['error' => 'Nombre y precio mayor a cero son obligatorios'], 422);
+        if ($nombre === '') {
+            return $this->json($response, ['error' => 'El nombre no puede estar vacío'], 422);
+        }
+
+        if ($precio <= 0) {
+            return $this->json($response, ['error' => 'El precio debe ser mayor a cero'], 422);
         }
 
         if (Producto::where('nombre', $nombre)->exists()) {
@@ -64,11 +60,11 @@ class ProductoController
             'nombre' => $nombre,
             'descripcion' => $data['descripcion'] ?? null,
             'precio' => $precio,
-            'disponible' => isset($data['disponible']) ? (bool) $data['disponible'] : true,
+            'disponible' => array_key_exists('disponible', $data) ? $this->booleano($data['disponible']) : true,
             'categoria_id' => $categoria->id,
         ]);
 
-        return $this->json($response, $producto->toArray(), 201);
+        return $this->json($response, $producto->load('categoria')->toArray(), 201);
     }
 
     public function update(Request $request, Response $response, array $args): Response
@@ -81,7 +77,7 @@ class ProductoController
 
         $data = (array) $request->getParsedBody();
 
-        if (isset($data['nombre'])) {
+        if (array_key_exists('nombre', $data)) {
             $nombre = trim((string) $data['nombre']);
 
             if ($nombre === '') {
@@ -99,7 +95,7 @@ class ProductoController
             $producto->nombre = $nombre;
         }
 
-        if (isset($data['precio'])) {
+        if (array_key_exists('precio', $data)) {
             $precio = (float) $data['precio'];
 
             if ($precio <= 0) {
@@ -124,12 +120,12 @@ class ProductoController
         }
 
         if (array_key_exists('disponible', $data)) {
-            $producto->disponible = (bool) $data['disponible'];
+            $producto->disponible = $this->booleano($data['disponible']);
         }
 
         $producto->save();
 
-        return $this->json($response, $producto->toArray());
+        return $this->json($response, $producto->load('categoria')->toArray());
     }
 
     public function destroy(Request $request, Response $response, array $args): Response
@@ -158,10 +154,9 @@ class ProductoController
         return null;
     }
 
-    private function json(Response $response, array $data, int $status = 200): Response
+    // Acepta true/false, 1/0 y "true"/"false" (un (bool) "false" daría true)
+    private function booleano($valor): bool
     {
-        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
-
-        return $response->withStatus($status)->withHeader('Content-Type', 'application/json');
+        return filter_var($valor, FILTER_VALIDATE_BOOLEAN);
     }
 }

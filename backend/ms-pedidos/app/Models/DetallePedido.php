@@ -10,6 +10,13 @@ class DetallePedido extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'producto_id' => 'integer',
+        'cantidad' => 'integer',
+        'precio_unitario' => 'float',
+        'subtotal' => 'float',
+    ];
+
     public function pedido()
     {
         return $this->belongsTo(Pedido::class, 'pedido_id');
