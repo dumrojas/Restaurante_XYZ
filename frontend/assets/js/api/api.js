@@ -20,14 +20,6 @@ const TokenStore = {
     localStorage.setItem(this.TOKEN_KEY, token);
   },
 
-  getUser() {
-    try {
-      return JSON.parse(localStorage.getItem(this.USER_KEY)) || null;
-    } catch (error) {
-      return null;
-    }
-  },
-
   setUser(usuario) {
     localStorage.setItem(this.USER_KEY, JSON.stringify(usuario));
   },
@@ -42,6 +34,7 @@ function esPaginaLogin() {
   return window.location.pathname.endsWith('login.html');
 }
 
+// Ruta al login válida tanto desde index.html como desde pages/<modulo>/
 function rutaLogin() {
   return window.location.pathname.includes('/pages/') ? '../auth/login.html' : 'pages/auth/login.html';
 }
@@ -76,7 +69,7 @@ async function request(service, path, options = {}) {
 
   try {
     response = await fetch(API_BASE[service] + path, { ...options, headers });
-  } catch (error) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor. Verifica que los microservicios estén activos.');
   }
 
@@ -86,7 +79,7 @@ async function request(service, path, options = {}) {
   if (text) {
     try {
       data = JSON.parse(text);
-    } catch (error) {
+    } catch {
       data = null;
     }
   }

@@ -1,6 +1,6 @@
 // Utilidades comunes del frontend
 
-function showMessage(message, type = 'info') {
+function showMessage(message, type) {
   const toast = document.createElement('div');
   toast.className = 'toast toast-' + type;
   toast.textContent = message;
@@ -57,18 +57,18 @@ async function logout() {
     if (TokenStore.get()) {
       await api.auth.logout();
     }
-  } catch (error) {
+  } catch {
     // La sesión local se cierra aunque el servidor no responda
   }
 
   TokenStore.clear();
-  window.location.href = '../auth/login.html';
-}
+  window.location.href = rutaLogin();
+  }
 
 // Redirige al login cuando no hay una sesión guardada
 function requireSession() {
   if (!TokenStore.get()) {
-    window.location.href = '../auth/login.html';
+    window.location.href = rutaLogin();
     return false;
   }
 

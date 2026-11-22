@@ -32,7 +32,7 @@ Todos los servicios responden JSON. Las rutas de negocio requieren el encabezado
 }
 ```
 
-Errores: `401` credenciales incorrectas, `403` usuario inactivo, `422` campos obligatorios.
+Errores: `401` credenciales incorrectas o token no válido, `403` usuario inactivo, `422` campos obligatorios.
 
 ## ms-reservas
 
@@ -40,11 +40,11 @@ Errores: `401` credenciales incorrectas, `403` usuario inactivo, `422` campos ob
 | --- | --- | --- | --- |
 | GET | `/mesas` | Lista de mesas | Sí |
 | POST | `/mesas` | Crea una mesa | Sí |
-| PUT | `/mesas/{id}` | Edita capacidad y estado | Sí |
+| PUT | `/mesas/{id}` | Edita capacidad y estado (el número no se modifica) | Sí |
 | GET | `/reservas` | Lista/busca reservas (`?fecha=`, `?cliente=`, `?estado=`) | Sí |
 | POST | `/reservas` | Crea una reserva | Sí |
 | PUT | `/reservas/{id}` | Edita la reserva, incluido su estado | Sí |
-| PATCH | `/reservas/{id}/cancelar` | Cancela una reserva | Sí |
+| PATCH | `/reservas/{id}/cancelar` | Cancela una reserva pendiente o confirmada | Sí |
 
 `POST /mesas`
 
@@ -70,9 +70,11 @@ Estados de mesa: `disponible`, `reservada`, `ocupada`, `fuera_servicio`.
 
 Estados de reserva: `pendiente`, `confirmada`, `cancelada`, `finalizada`.
 
-Validaciones: no se permiten fechas pasadas, mesas fuera de servicio, exceder la
-capacidad ni duplicar la reserva de una mesa en la misma fecha y hora. También se
-validan mesas duplicadas y capacidad mayor a cero.
+Validaciones: no se permiten fechas u horas pasadas (zona horaria `APP_TIMEZONE`,
+por defecto `America/Bogota`), mesas fuera de servicio, exceder la capacidad ni
+duplicar la reserva de una mesa en la misma fecha y hora. Si una reserva cancelada o
+finalizada vuelve a `pendiente` o `confirmada`, se valida de nuevo. También se validan
+mesas duplicadas y capacidad mayor a cero.
 
 Errores: `404` no encontrado, `409` duplicado, `422` validación, `401` sin token válido.
 
@@ -80,7 +82,7 @@ Errores: `404` no encontrado, `409` duplicado, `422` validación, `401` sin toke
 
 | Método | Ruta | Descripción | Protegida |
 | --- | --- | --- | --- |
-| GET | `/productos` | Lista/busca productos (`?categoria=`, `?disponible=`, `?buscar=`) | Sí |
+| GET | `/productos` | Lista/busca productos (`?categoria_id=`, `?categoria=`, `?disponible=`, `?buscar=`) | Sí |
 | POST | `/productos` | Crea un producto | Sí |
 | PUT | `/productos/{id}` | Edita nombre, categoría, precio y disponibilidad | Sí |
 | DELETE | `/productos/{id}` | Elimina un producto | Sí |
@@ -90,14 +92,15 @@ Errores: `404` no encontrado, `409` duplicado, `422` validación, `401` sin toke
 ```json
 {
   "nombre": "Hamburguesa Especial",
-  "categoria": "Platos fuertes",
+  "categoria_id": 3,
   "precio": 28000,
   "disponible": true
 }
 ```
 
-Categorías sugeridas: Entradas, Bebidas, Platos fuertes y Postres. Deben existir en
-la tabla `categorias` del esquema entregado; el servicio no las crea automáticamente.
+La categoría se indica con `categoria_id` o con su nombre en `categoria`. Las categorías
+sugeridas (Entradas, Bebidas, Platos fuertes y Postres) vienen en la tabla `categorias`
+del esquema entregado. Cada producto se devuelve con su objeto `categoria`.
 
 Validaciones: nombre y categoría obligatorios, precio mayor a cero y nombre de
 producto no duplicado.
@@ -133,10 +136,16 @@ calcula sumando el campo `cantidad` de los detalles y se devuelve como `cantidad
 calculado, sin almacenarlo en la base de datos. Al agregar, cambiar o quitar productos se
 recalculan `subtotal` y `total`. El esquema SQL entregado no se modifica.
 
+El pedido y su detalle se guardan en una sola transacción. Si un producto se agrega
+dos veces, se suma su cantidad en el mismo detalle. El precio y el nombre del producto
+los envía el frontend, porque los microservicios no se comunican entre sí.
+
 Estados: `pendiente`, `en_preparacion`, `entregado`, `pagado`, `cancelado`.
 
-Validaciones: pedido no vacío, cantidades mayores a cero, identificadores de producto
-y mesa obligatorios, estado válido, y solo se registran pedidos para mesas `reservada`
-u `ocupada` (no para mesas disponibles o fuera de servicio).
+Validaciones: pedido no vacío (tampoco se puede quitar su último producto), cantidades
+mayores a cero, precio mayor a cero, identificadores de producto y mesa obligatorios,
+estado válido, y solo se registran pedidos para mesas `reservada` u `ocupada` (no para
+mesas disponibles o fuera de servicio). Un pedido `pagado` o `cancelado` está cerrado:
+no se le agregan, cambian ni quitan productos, ni cambia de estado.
 
 Errores: `404` no encontrado, `422` validación, `401` sin token válido.

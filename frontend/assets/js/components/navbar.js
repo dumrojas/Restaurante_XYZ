@@ -37,7 +37,6 @@ function renderNav(active) {
   const logoutLink = document.createElement('a');
   logoutLink.href = '#';
   logoutLink.textContent = 'Cerrar sesión';
-  logoutLink.title = 'Cerrar sesión';
   logoutLink.addEventListener('click', (event) => {
     event.preventDefault();
     logout();

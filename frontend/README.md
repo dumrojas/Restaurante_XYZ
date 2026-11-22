@@ -9,10 +9,10 @@ Consume las APIs REST de los microservicios con `fetch`.
 frontend/
 ├── assets/
 │   ├── css/          # hojas de estilo
-│   ├── img/          # imágenes
 │   └── js/
 │       ├── api/      # llamadas a los microservicios
 │       ├── components/  # componentes reutilizables
+│       ├── pages/    # lógica de cada pantalla
 │       └── utils/    # funciones auxiliares
 ├── pages/
 │   ├── auth/         # inicio de sesión
@@ -29,7 +29,7 @@ Las pantallas consumen los microservicios en los puertos 8000 a 8003:
 
 - `ms-auth`: login, logout y validación de sesión.
 - `ms-reservas`: mesas y reservas.
-- `ms-productos`: categorías y productos.
+- `ms-productos`: productos del menú.
 - `ms-pedidos`: pedidos con detalle y total.
 
 Para probar el frontend hay que iniciar los cuatro servicios y servir esta carpeta:
