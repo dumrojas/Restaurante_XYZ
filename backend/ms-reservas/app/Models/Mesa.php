@@ -9,4 +9,8 @@ class Mesa extends Model
     protected $table = 'mesas';
 
     protected $guarded = [];
+
+    protected $casts = [
+        'capacidad' => 'integer',
+    ];
 }

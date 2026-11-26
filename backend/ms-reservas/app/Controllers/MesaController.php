@@ -6,7 +6,7 @@ use App\Models\Mesa;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
-class MesaController
+class MesaController extends Controller
 {
     private const ESTADOS = ['disponible', 'reservada', 'ocupada', 'fuera_servicio'];
 
@@ -23,8 +23,12 @@ class MesaController
         $capacidad = (int) ($data['capacidad'] ?? 0);
         $estado = (string) ($data['estado'] ?? 'disponible');
 
-        if ($numero === '' || $capacidad <= 0) {
-            return $this->json($response, ['error' => 'Número y capacidad son obligatorios'], 422);
+        if ($numero === '') {
+            return $this->json($response, ['error' => 'El número o nombre de la mesa es obligatorio'], 422);
+        }
+
+        if ($capacidad <= 0) {
+            return $this->json($response, ['error' => 'La capacidad debe ser mayor a cero'], 422);
         }
 
         if (!in_array($estado, self::ESTADOS, true)) {
@@ -44,6 +48,7 @@ class MesaController
         return $this->json($response, $mesa->toArray(), 201);
     }
 
+    // Según el enunciado, de una mesa solo se editan la capacidad y el estado
     public function update(Request $request, Response $response, array $args): Response
     {
         $mesa = Mesa::find((int) $args['id']);
@@ -75,12 +80,5 @@ class MesaController
         $mesa->save();
 
         return $this->json($response, $mesa->toArray());
-    }
-
-    private function json(Response $response, array $data, int $status = 200): Response
-    {
-        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
-
-        return $response->withStatus($status)->withHeader('Content-Type', 'application/json');
     }
 }
