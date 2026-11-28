@@ -3,10 +3,10 @@
     "description": "Microservicio de productos del menu del restaurante",
     "type": "project",
     "require": {
-        "php": ">=8.0",
-        "slim/slim": "4.*",
-        "slim/psr7": "^1.8",
-        "illuminate/database": "^12.73"
+        "php": "^8.0.2",
+        "illuminate/database": "^9.52",
+        "slim/psr7": "^1.6",
+        "slim/slim": "^4.12"
     },
     "autoload": {
         "psr-4": {
@@ -14,7 +14,9 @@
         }
     },
     "config": {
+        "platform": {
+            "php": "8.0.2"
+        },
         "sort-packages": true
     }
 }
-
