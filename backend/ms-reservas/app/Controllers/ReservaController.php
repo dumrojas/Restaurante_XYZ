@@ -4,12 +4,20 @@ namespace App\Controllers;
 
 use App\Models\Mesa;
 use App\Models\Reserva;
+use DateTime;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
-class ReservaController
+class ReservaController extends Controller
 {
     private const ESTADOS = ['pendiente', 'confirmada', 'cancelada', 'finalizada'];
+
+    // Estados que ocupan la mesa en su fecha y hora
+    private const ACTIVAS = ['pendiente', 'confirmada'];
+
+    private const CAMPOS = [
+        'nombre_cliente', 'telefono_cliente', 'cantidad_personas', 'fecha', 'hora', 'observaciones', 'mesa_id', 'estado',
+    ];
 
     public function index(Request $request, Response $response): Response
     {
@@ -28,31 +36,19 @@ class ReservaController
             $query->where('estado', $params['estado']);
         }
 
-        $reservas = $query->orderBy('fecha')->orderBy('hora')->get()->toArray();
-
-        return $this->json($response, $reservas);
+        return $this->json($response, $query->orderBy('fecha')->orderBy('hora')->get()->toArray());
     }
 
     public function store(Request $request, Response $response): Response
     {
         $data = (array) $request->getParsedBody();
-
         $error = $this->validarReserva($data);
 
         if ($error !== null) {
             return $this->json($response, ['error' => $error], 422);
         }
 
-        $reserva = Reserva::create([
-            'nombre_cliente' => trim((string) $data['nombre_cliente']),
-            'telefono_cliente' => trim((string) $data['telefono_cliente']),
-            'cantidad_personas' => (int) $data['cantidad_personas'],
-            'fecha' => $data['fecha'],
-            'hora' => $data['hora'],
-            'observaciones' => $data['observaciones'] ?? null,
-            'estado' => 'pendiente',
-            'mesa_id' => (int) $data['mesa_id'],
-        ]);
+        $reserva = Reserva::create($this->datosReserva($data) + ['estado' => 'pendiente']);
 
         return $this->json($response, $reserva->toArray(), 201);
     }
@@ -65,16 +61,21 @@ class ReservaController
             return $this->json($response, ['error' => 'Reserva no encontrada'], 404);
         }
 
-        $datos = (array) $request->getParsedBody();
+        $cambios = array_intersect_key((array) $request->getParsedBody(), array_flip(self::CAMPOS));
 
-        if (isset($datos['estado']) && !in_array($datos['estado'], self::ESTADOS, true)) {
+        if (isset($cambios['estado']) && !in_array($cambios['estado'], self::ESTADOS, true)) {
             return $this->json($response, ['error' => 'Estado de reserva no válido'], 422);
         }
 
-        $soloEstado = array_keys($datos) === ['estado'];
-        $data = array_merge($reserva->toArray(), $datos);
+        $data = array_merge($reserva->only(self::CAMPOS), $cambios);
 
-        if (!$soloEstado) {
+        // Un cambio de estado simple no se valida de nuevo, salvo que reactive
+        // una reserva cancelada o finalizada: ahí la mesa podría estar ocupada
+        $soloEstado = array_keys($cambios) === ['estado'];
+        $reactiva = !in_array($reserva->estado, self::ACTIVAS, true)
+            && in_array($data['estado'], self::ACTIVAS, true);
+
+        if (!$soloEstado || $reactiva) {
             $error = $this->validarReserva($data, (int) $reserva->id);
 
             if ($error !== null) {
@@ -82,17 +83,7 @@ class ReservaController
             }
         }
 
-        $reserva->fill([
-            'nombre_cliente' => trim((string) $data['nombre_cliente']),
-            'telefono_cliente' => trim((string) $data['telefono_cliente']),
-            'cantidad_personas' => (int) $data['cantidad_personas'],
-            'fecha' => $data['fecha'],
-            'hora' => $data['hora'],
-            'observaciones' => $data['observaciones'] ?? null,
-            'mesa_id' => (int) $data['mesa_id'],
-            'estado' => $data['estado'],
-        ]);
-
+        $reserva->fill($this->datosReserva($data) + ['estado' => $data['estado']]);
         $reserva->save();
 
         return $this->json($response, $reserva->toArray());
@@ -106,14 +97,34 @@ class ReservaController
             return $this->json($response, ['error' => 'Reserva no encontrada'], 404);
         }
 
-        if ($reserva->estado === 'finalizada') {
-            return $this->json($response, ['error' => 'La reserva ya fue finalizada'], 422);
+        if (!in_array($reserva->estado, self::ACTIVAS, true)) {
+            return $this->json($response, ['error' => 'Solo se pueden cancelar reservas pendientes o confirmadas'], 422);
         }
 
         $reserva->estado = 'cancelada';
         $reserva->save();
 
         return $this->json($response, $reserva->toArray());
+    }
+
+    private function datosReserva(array $data): array
+    {
+        $observaciones = trim((string) ($data['observaciones'] ?? ''));
+
+        return [
+            'nombre_cliente' => trim((string) $data['nombre_cliente']),
+            'telefono_cliente' => trim((string) $data['telefono_cliente']),
+            'cantidad_personas' => (int) $data['cantidad_personas'],
+            'fecha' => $data['fecha'],
+            'hora' => $this->normalizarHora((string) $data['hora']),
+            'observaciones' => $observaciones === '' ? null : $observaciones,
+            'mesa_id' => (int) $data['mesa_id'],
+        ];
+    }
+
+    private function normalizarHora(string $hora): string
+    {
+        return substr($hora, 0, 5) . ':00';
     }
 
     private function validarReserva(array $data, ?int $id = null): ?string
@@ -130,8 +141,16 @@ class ReservaController
             return 'La cantidad de personas debe ser mayor a cero';
         }
 
-        if ($data['fecha'] < date('Y-m-d')) {
-            return 'No se permiten reservas en fechas pasadas';
+        $fecha = (string) $data['fecha'];
+        $hora = substr((string) $data['hora'], 0, 5);
+        $fechaHora = DateTime::createFromFormat('!Y-m-d H:i', $fecha . ' ' . $hora);
+
+        if (!$fechaHora || $fechaHora->format('Y-m-d H:i') !== $fecha . ' ' . $hora) {
+            return 'La fecha o la hora no tienen un formato válido';
+        }
+
+        if ($fechaHora < new DateTime()) {
+            return 'No se permiten reservas en fechas u horas pasadas';
         }
 
         $mesa = Mesa::find((int) $data['mesa_id']);
@@ -149,9 +168,9 @@ class ReservaController
         }
 
         $ocupada = Reserva::where('mesa_id', $mesa->id)
-            ->where('fecha', $data['fecha'])
-            ->where('hora', $data['hora'])
-            ->whereIn('estado', ['pendiente', 'confirmada'])
+            ->where('fecha', $fecha)
+            ->where('hora', $this->normalizarHora($hora))
+            ->whereIn('estado', self::ACTIVAS)
             ->when($id !== null, fn ($query) => $query->where('id', '!=', $id))
             ->exists();
 
@@ -160,12 +179,5 @@ class ReservaController
         }
 
         return null;
-    }
-
-    private function json(Response $response, array $data, int $status = 200): Response
-    {
-        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
-
-        return $response->withStatus($status)->withHeader('Content-Type', 'application/json');
     }
 }

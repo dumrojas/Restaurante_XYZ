@@ -10,6 +10,11 @@ class Reserva extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'cantidad_personas' => 'integer',
+        'mesa_id' => 'integer',
+    ];
+
     public function mesa()
     {
         return $this->belongsTo(Mesa::class, 'mesa_id');
